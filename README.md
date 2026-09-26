@@ -1,70 +1,70 @@
 # Vyron Hosting
 
-Vyron Hosting ist eine selbst gehostete Hosting-Plattform für virtuelle Server,
-Node.js-Websites, Minecraft-Server und verwaltete Domains. Dieses Repository
-enthält das Kunden-Dashboard, das Adminpanel, die öffentliche Statusseite, die
-zentrale API und den Agenten für den Compute-Host.
+Vyron Hosting is a self-hosted platform for virtual servers, Node.js websites,
+Minecraft servers, and managed domains. This repository contains the customer
+dashboard, administration panel, public status page, central API, and the agent
+that controls the compute host.
 
-> **Wichtig:** Zugangsdaten gehören niemals in Git. Die Plattform liest Secrets
-> aus geschützten Dateien unter `/home/x1/.config/vyron/` oder aus
-> Umgebungsvariablen. Diese Dateien werden von diesem Repository nicht verwaltet.
+> **Important:** Credentials must never be committed to Git. The platform reads
+> secrets from protected files under `/home/x1/.config/vyron/` or from
+> environment variables. Those files are not managed by this repository.
 
-## Komponenten
+## Components
 
-| Ordner | Dienst | Standard-Port | Aufgabe |
+| Directory | Service | Default port | Purpose |
 | --- | --- | ---: | --- |
-| [`Webserver`](./Webserver) | `vyron-app` | `3001` | React/Vite-Kundenportal, Landingpage und Node-Verwaltung |
-| [`Appserver`](./Appserver) | `vyron-panel` | `3002` | Server für das Vyron-Adminpanel |
-| [`Statusserver`](./Statusserver) | `vyron-status` | `3004` | Öffentliche Statusseite und Discord Embedded Activity |
-| [`API`](./API) | `vyron-api` | `8787` | Authentifizierung, Workspaces, Abrechnung, Domains, MCP und Orchestrierung |
-| [`Agent`](./Agent) | `vyron-agent` | `8790` | Compute-Host-Agent, VM-Provisionierung, Dateien, Terminal und Minecraft |
-| [`scripts`](./scripts) | Hilfsprogramme | – | Betriebs- und Statusskripte |
+| [`Webserver`](./Webserver) | `vyron-app` | `3001` | React/Vite customer portal, landing page, and node management |
+| [`Appserver`](./Appserver) | `vyron-panel` | `3002` | Server for the Vyron administration panel |
+| [`Statusserver`](./Statusserver) | `vyron-status` | `3004` | Public status page and Discord Embedded Activity |
+| [`API`](./API) | `vyron-api` | `8787` | Authentication, workspaces, billing, domains, MCP, and orchestration |
+| [`Agent`](./Agent) | `vyron-agent` | `8790` | Compute-host agent, VM provisioning, files, terminal, and Minecraft |
+| [`scripts`](./scripts) | Utilities | – | Operational and status scripts |
 
-Weitere zentrale Dateien:
+Other important files:
 
-- [`ecosystem.config.cjs`](./ecosystem.config.cjs) startet alle Dienste mit PM2.
+- [`ecosystem.config.cjs`](./ecosystem.config.cjs) starts all services with PM2.
 - [`DomainConnect/vyronhosting.com.hosting.json`](./DomainConnect/vyronhosting.com.hosting.json)
-  beschreibt die Vyron-Domain-Connect-Konfiguration.
-- [`Agent/vyron-provision`](./Agent/vyron-provision) ist das privilegierte
-  Provisionierungsprogramm für Linux/libvirt.
-- [`Agent/vyron-agent.sudoers`](./Agent/vyron-agent.sudoers) begrenzt die dafür
-  erlaubten `sudo`-Aufrufe.
+  contains the Vyron Domain Connect template.
+- [`Agent/vyron-provision`](./Agent/vyron-provision) is the privileged Linux and
+  libvirt provisioning utility.
+- [`Agent/vyron-agent.sudoers`](./Agent/vyron-agent.sudoers) restricts the
+  `sudo` commands available to the agent.
 
-## Architektur
+## Architecture
 
 ```text
 Browser
   ├── app.vyronhosting.com ───────> Webserver
-  ├── Adminpanel ─────────────────> Appserver
+  ├── Administration panel ───────> Appserver
   └── status.vyronpanel.com ──────> Statusserver
                                       │
 Webserver / Appserver ───────────────> API
                                       │
-                                      ├── PostgreSQL / lokaler State
-                                      ├── Stripe, PayPal und Cloudflare
-                                      └── Agent (nur intern)
+                                      ├── PostgreSQL / local state
+                                      ├── Stripe, PayPal, and Cloudflare
+                                      └── Agent (internal only)
                                              │
-                                             └── libvirt/KVM-Gäste
+                                             └── libvirt/KVM guests
 ```
 
-Der Agent darf nicht direkt öffentlich erreichbar sein. Die API authentifiziert
-interne Agent-Anfragen mit einem separaten Token. Öffentliche Node-Hostnamen
-werden über Cloudflare Tunnel an den Router des Agenten weitergeleitet.
+The agent must not be exposed directly to the public internet. The API
+authenticates internal agent requests with a dedicated token. Public node
+hostnames are routed through Cloudflare Tunnel to the agent's public router.
 
-## Voraussetzungen
+## Requirements
 
-- Node.js 22 oder neuer
+- Node.js 22 or newer
 - npm
-- PM2 für den Produktionsbetrieb
-- Linux auf dem Compute-Host
-- libvirt/KVM und die für `vyron-provision` benötigten Systemprogramme
-- optional PostgreSQL; ohne `DATABASE_URL` verwendet die API lokalen JSON-State
-- ein Cloudflare-Konto und Tunnel für verwaltete Domains
-- Stripe- beziehungsweise PayPal-Testzugänge für Zahlungsfunktionen
+- PM2 for production process management
+- Linux on the compute host
+- libvirt/KVM and the system utilities required by `vyron-provision`
+- optional PostgreSQL; without `DATABASE_URL`, the API uses local JSON state
+- a Cloudflare account and tunnel for managed domains
+- Stripe and/or PayPal test credentials for payment features
 
 ## Installation
 
-Repository klonen und alle Abhängigkeiten installieren:
+Clone the repository and install all dependencies:
 
 ```bash
 git clone https://github.com/niceguyyk/vyronhosting.git
@@ -72,13 +72,13 @@ cd vyronhosting
 npm run install:all
 ```
 
-Frontend und Discord Activity bauen:
+Build the customer frontend and Discord Activity:
 
 ```bash
 npm run build
 ```
 
-Alle Dienste mit PM2 starten:
+Start all services with PM2:
 
 ```bash
 npm install --global pm2
@@ -86,16 +86,16 @@ npm start
 pm2 save
 ```
 
-Status prüfen:
+Check their status:
 
 ```bash
 pm2 status
 pm2 logs
 ```
 
-## Lokale Entwicklung
+## Local development
 
-Kundenportal mit Hot Reload:
+Start the customer portal with hot reload:
 
 ```bash
 cd Webserver
@@ -103,7 +103,7 @@ npm install
 npm run dev
 ```
 
-Die übrigen Dienste können jeweils in einem eigenen Terminal gestartet werden:
+The other services can be started in separate terminals:
 
 ```bash
 cd API && npm start
@@ -112,12 +112,12 @@ cd Appserver && npm start
 cd Statusserver && npm start
 ```
 
-Der Agent benötigt unter Windows keine funktionierende VM-Provisionierung. Für
-echte Node-Operationen muss er auf dem vorgesehenen Linux-Compute-Host laufen.
+The agent can run on Windows for limited development purposes, but actual VM
+provisioning requires the designated Linux compute host.
 
-## Konfiguration und Secrets
+## Configuration and secrets
 
-Die Produktionsinstallation verwendet standardmäßig diese geschützten Dateien:
+The production installation uses the following protected files by default:
 
 ```text
 /home/x1/.config/vyron/api-key
@@ -134,12 +134,12 @@ Die Produktionsinstallation verwendet standardmäßig diese geschützten Dateien
 /home/x1/.config/vyron/turnstile-secret
 ```
 
-Dateirechte sollten auf `600` gesetzt sein. Secrets dürfen weder in Commits noch
-in Browser-Bundles landen.
+These files should use permissions `600`. Secrets must never be included in
+commits or client-side browser bundles.
 
-## Compute-Agent installieren
+## Installing the compute agent
 
-Auf dem Linux-Compute-Host:
+Run the following commands on the Linux compute host:
 
 ```bash
 sudo install -o root -g root -m 0755 Agent/vyron-provision /usr/local/sbin/vyron-provision
@@ -147,12 +147,12 @@ sudo install -o root -g root -m 0440 Agent/vyron-agent.sudoers /etc/sudoers.d/vy
 sudo visudo -cf /etc/sudoers.d/vyron-agent
 ```
 
-Danach den Agenten über PM2 starten. Der gemeinsame Agent-Token muss beim Agenten
-und bei der API identisch konfiguriert sein.
+Then start the agent through PM2. The API and agent must be configured with the
+same internal agent token.
 
-## Produktion
+## Production
 
-Die PM2-Konfiguration nutzt folgende Prozesse:
+The PM2 configuration defines the following processes:
 
 ```text
 vyron-app       Webserver
@@ -162,7 +162,7 @@ vyron-status    Statusserver
 vyron-agent     Agent
 ```
 
-Nach einem Update:
+To deploy an update:
 
 ```bash
 git pull
@@ -171,21 +171,19 @@ npm run build
 npm run restart
 ```
 
-Vor einem Produktiv-Deployment sollten mindestens Syntaxprüfung, Frontend-Build
-und ein Smoke-Test aller öffentlichen Routen durchgeführt werden.
+Before a production deployment, run syntax checks, build the frontend, and
+perform smoke tests against every public route.
 
-## Sicherheit
+## Security
 
-- Der Agent bleibt ausschließlich im privaten Netzwerk erreichbar.
-- API-, Agent-, Cloudflare- und Zahlungs-Keys werden nicht im Repository gespeichert.
-- Terminal- und Dateioperationen werden serverseitig autorisiert und protokolliert.
-- Backups der Zustandsdaten und der VM-Datenträger müssen außerhalb dieses
-  Repositorys gespeichert werden.
-- Änderungen an `vyron-provision` oder der sudoers-Datei sollten vor dem Rollout
-  separat geprüft werden.
+- Keep the agent accessible only from the private network.
+- Do not store API, agent, Cloudflare, or payment credentials in this repository.
+- Authorize and audit terminal and file operations on the server side.
+- Store state and VM disk backups outside this repository.
+- Review changes to `vyron-provision` and the sudoers policy separately before
+  deploying them.
 
-## Lizenz
+## License
 
-Proprietäre Software von Vyron Technologies. Eine Nutzung, Weitergabe oder
-Veröffentlichung außerhalb des autorisierten Vyron-Betriebs ist ohne vorherige
-Erlaubnis nicht gestattet.
+Proprietary software by Vyron Technologies. Use, redistribution, or publication
+outside the authorized Vyron environment is not permitted without prior approval.

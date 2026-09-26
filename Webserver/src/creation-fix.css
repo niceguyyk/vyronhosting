@@ -1,0 +1,16 @@
+.creation-steps span{position:relative}
+.creation-steps span:not(:last-child)::after{content:"";position:absolute;top:3px;left:calc(50% + 7px);width:calc(100% - 2px);height:1px;background:#3b3744}
+.creation-steps span i{position:relative;z-index:1}
+.creation-steps span.done{color:#68d6a2}
+.creation-steps span.done i{background:#4fc58e;box-shadow:0 0 0 5px #4fc58e18}
+.creation-steps span.done:not(:last-child)::after{background:#4fc58e}
+.player-usage{margin-top:14px}
+.minecraft-player-usage{margin-top:0}
+.player-usage .player-line{fill:none;vector-effect:non-scaling-stroke;stroke-width:2;stroke:#38a780}
+.player-usage .player-area{fill:url(#playerFill)}
+.graph-dot.player,.graph-tooltip i.player,.player-usage footer i.player{background:#38a780}
+.usage-live{display:flex;align-items:center;gap:6px;color:#63d6a2;font-size:8px}
+.usage-live i{width:6px;height:6px;border-radius:50%;background:#4fd49d;box-shadow:0 0 8px #4fd49d}
+.copy-action.copied{transform:none!important;filter:none!important;animation:none!important;color:#58d49b!important}
+.copy-action>span{animation:copyToastNormal .18s ease-out!important}
+@keyframes copyToastNormal{from{opacity:0}to{opacity:1}}

@@ -1,0 +1,12 @@
+{
+  "name": "vyronhosting",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Vyron Hosting web platform, API, status service and compute-node agent.",
+  "scripts": {
+    "install:all": "npm ci --prefix API && npm ci --prefix Agent && npm ci --prefix Appserver && npm ci --prefix Statusserver && npm ci --prefix Webserver",
+    "build": "npm run build --prefix Webserver && npm run build:discord --prefix Statusserver",
+    "start": "pm2 start ecosystem.config.cjs",
+    "restart": "pm2 restart ecosystem.config.cjs --update-env"
+  }
+}

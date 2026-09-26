@@ -1,0 +1,7 @@
+/* Keep domain panel content away from the outer card edge. */
+.domain-connect-panel > .domain-connect-form.domain-only{margin:18px 16px 0}
+.domain-connect-panel > .vh-error{margin:12px 16px 0}
+.domain-connect-panel > .dns-domain-list{margin:18px 16px 16px;padding-top:0}
+.domain-connect-panel > .dns-domain-list .dns-domain-card{border-radius:12px}
+.domain-connect-panel > .dns-domain-list .dns-domain-card:last-child{margin-bottom:0}
+@media(max-width:800px){.domain-connect-panel > .domain-connect-form.domain-only{margin-left:12px;margin-right:12px}.domain-connect-panel > .dns-domain-list{margin-left:12px;margin-right:12px}}

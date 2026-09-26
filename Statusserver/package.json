@@ -1,0 +1,14 @@
+{
+  "name": "vyron-status",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build:discord": "esbuild public/discord-activity-src.js --bundle --format=esm --platform=browser --target=es2022 --minify --outfile=public/discord-activity.js",
+    "start": "node server.js"
+  },
+  "devDependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
+    "esbuild": "^0.28.2"
+  }
+}

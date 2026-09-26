@@ -1,0 +1,63 @@
+.theme-toggle {
+  width: 32px;
+  height: 31px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+}
+
+.theme-toggle:hover { color: #7052d2; background: #f4f1ff; }
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --border: #30302f;
+  --muted: #969590;
+}
+
+html[data-theme="dark"],
+html[data-theme="dark"] body { background: #151515; color: #ececea; }
+html[data-theme="dark"] .sidebar { background: #191919; }
+html[data-theme="dark"] .topbar { background: rgba(25,25,25,.9); }
+
+html[data-theme="dark"] :is(
+  .workspace, .usage-mini, .stat-card, .panel, .search-btn, .docs,
+  .theme-toggle, .usage-panel select, .agent-online, .toolbar label,
+  .toolbar button, .agent-chat form, .plans>button, .custom-sliders,
+  .template-grid button, .blank-template, .domain-input>div,
+  .modal-foot, .secondary
+) { background: #202020; color: #ececea; }
+
+html[data-theme="dark"] :is(.deploy-modal, .success-modal) { background: #1b1b1b; color: #ececea; }
+html[data-theme="dark"] input { background: transparent; color: #ececea; }
+html[data-theme="dark"] .sidebar nav button { color: #aaa9a5; }
+html[data-theme="dark"] .sidebar nav button:hover { background: #252525; color: #fff; }
+html[data-theme="dark"] .sidebar nav button.active { background: #30284b; color: #bdaaff; }
+html[data-theme="dark"] .logo-mark,
+html[data-theme="dark"] .primary { background: #f0f0ed; color: #191919; }
+html[data-theme="dark"] .logo-mark span { border-color: #191919; }
+html[data-theme="dark"] .primary:hover { background: #fff; }
+
+html[data-theme="dark"] :is(
+  .panel-title, .instance, .agent-event div, .job, .server-foot,
+  .steps, .modal-foot, .launch-summary div, .account
+) { border-color: #30302f; }
+
+html[data-theme="dark"] :is(.metric b, .legend b, .card-metrics strong, .blank-template strong) { color: #d5d4d0; }
+html[data-theme="dark"] :is(.metric>i, .card-metrics i, .usage-track, .loading-line) { background: #383837; }
+html[data-theme="dark"] .chart>i { background: #2b2b2a; }
+html[data-theme="dark"] .chart { border-color: #343432; }
+html[data-theme="dark"] :is(.prompt-chips button, .launch-summary) { background: #252525; color: #aaa; }
+html[data-theme="dark"] :is(.server-foot span, .job>span.scheduled, .steps span i, .modal-top button) { background: #30302f; }
+html[data-theme="dark"] .theme-toggle:hover { background: #30284b; color: #c5b4ff; }
+html[data-theme="dark"] .search-btn kbd { background: #292929; border-color: #3a3a38; }
+html[data-theme="dark"] .launch { background: #8062e7; color: #fff; }
+html[data-theme="dark"] .terminal { background: #101110; border-color: #292a29; }
+html[data-theme="dark"] .modal-overlay { background: #0009; }
+
+.access-key { margin-top: 14px; }
+.access-key input { text-align: left; }
+.deploy-error { margin: 9px 0 0 !important; color: #c95d54 !important; font-size: 8px !important; }

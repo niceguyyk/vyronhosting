@@ -1,0 +1,31 @@
+# Dependencies and generated builds
+node_modules/
+dist/
+coverage/
+output/
+
+# Local tooling and test artifacts
+.playwright-cli/
+.tmp-*/
+.tmp-*
+__pycache__/
+*.pyc
+*.log
+desktop.ini
+
+# Environment variables and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local release archives and snapshots
+*.tgz
+*.tar.gz
+*.zip
+
+# Local checkout of the public Domain Connect template collection
+.domainconnect-templates/

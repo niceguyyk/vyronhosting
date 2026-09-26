@@ -1,0 +1,737 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT=/var/lib/libvirt/images/vyron
+BASE="$ROOT/base/noble-server-cloudimg-amd64.img"
+
+fail() { printf '{"error":"%s"}\n' "$1" >&2; exit 1; }
+
+# Keep CPU 0 available for the Vyron control plane so a busy guest cannot stall
+# the dashboard, API, tunnel, or host agent. Guests share the remaining CPUs.
+pin_vm_cpus() {
+  local vm_name="$1" vm_vcpus="$2" host_cpus guest_cpuset index vm_state
+  host_cpus=$(nproc)
+  (( host_cpus > 1 )) || return 0
+  guest_cpuset="1-$((host_cpus - 1))"
+  for index in $(seq 0 $((vm_vcpus - 1))); do
+    virsh -c qemu:///system vcpupin "$vm_name" "$index" "$guest_cpuset" --config >/dev/null
+  done
+  virsh -c qemu:///system emulatorpin "$vm_name" "$guest_cpuset" --config >/dev/null
+  vm_state=$(virsh -c qemu:///system domstate "$vm_name" 2>/dev/null | tr '[:upper:]' '[:lower:]' | xargs)
+  if [[ "$vm_state" == "running" ]]; then
+    for index in $(seq 0 $((vm_vcpus - 1))); do
+      virsh -c qemu:///system vcpupin "$vm_name" "$index" "$guest_cpuset" --live >/dev/null
+    done
+    virsh -c qemu:///system emulatorpin "$vm_name" "$guest_cpuset" --live >/dev/null
+  fi
+}
+
+sync_gateway() {
+  [[ -x /usr/local/bin/frpc && -f /etc/frp/token ]] || return 0
+  local temp instance_dir node port candidate state ip used=" "
+  temp=$(mktemp)
+  cat >"$temp" <<'EOF'
+serverAddr = "94.16.108.132"
+serverPort = 7000
+
+auth.method = "token"
+auth.tokenSource.type = "file"
+auth.tokenSource.file.path = "/etc/frp/token"
+
+transport.tls.enable = true
+
+[[proxies]]
+name = "vyron-minecraft"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 25565
+remotePort = 25565
+transport.useEncryption = true
+transport.useCompression = true
+EOF
+  for instance_dir in "$ROOT"/instances/*; do
+    [[ -d "$instance_dir" && -f "$instance_dir/spec" ]] || continue
+    node=$(basename "$instance_dir")
+    port=""
+    [[ -f "$instance_dir/access-port" ]] && port=$(tr -cd '0-9' <"$instance_dir/access-port")
+    if [[ ! "$port" =~ ^20[0-9]{3}$ ]] || (( port < 20000 || port > 20100 )) || [[ "$used" == *" $port "* ]]; then
+      port=""
+      for candidate in $(seq 20000 20100); do
+        if [[ "$used" != *" $candidate "* ]]; then port="$candidate"; break; fi
+      done
+      [[ -n "$port" ]] || { rm -f "$temp"; fail "No public SSH ports are available"; }
+      printf '%s\n' "$port" >"$instance_dir/access-port"
+      chmod 0600 "$instance_dir/access-port"
+    fi
+    used+="$port "
+    state=$(virsh -c qemu:///system domstate "$node" 2>/dev/null | tr '[:upper:]' '[:lower:]' | xargs || true)
+    ip=$(virsh -c qemu:///system domifaddr "$node" --source agent 2>/dev/null | awk '/ipv4/ && $4 !~ /^127\./ {split($4,a,"/"); print a[1]; exit}')
+    [[ -n "$ip" ]] || ip=$(virsh -c qemu:///system domifaddr "$node" --source lease 2>/dev/null | awk '/ipv4/ {split($4,a,"/"); print a[1]; exit}')
+    if [[ "$state" == "running" && -n "$ip" ]]; then
+      cat >>"$temp" <<EOF
+
+[[proxies]]
+name = "ssh-$node"
+type = "tcp"
+localIP = "$ip"
+localPort = 22
+remotePort = $port
+transport.useEncryption = true
+transport.useCompression = true
+EOF
+    fi
+  done
+  install -o root -g frp -m 0640 "$temp" /etc/frp/frpc.toml
+  rm -f "$temp"
+  systemctl daemon-reload
+  systemctl restart frpc
+}
+
+if [[ "${1:-}" == "list" ]]; then
+  names=$(virsh -c qemu:///system list --all --name | sed '/^$/d' | paste -sd, -)
+  printf '{"vms":"%s"}\n' "$names"
+  exit 0
+fi
+
+if [[ "${1:-}" == "gateway-sync" ]]; then
+  name="${2:-}"
+  [[ -z "$name" || "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  sync_gateway
+  if [[ -n "$name" ]]; then
+    [[ -f "$ROOT/instances/$name/access-port" ]] || fail "Node access port is unavailable"
+    port=$(tr -cd '0-9' <"$ROOT/instances/$name/access-port")
+    printf '{"name":"%s","hostname":"gateway.vyronhosting.com","sshPort":%s,"status":"active"}\n' "$name" "$port"
+  else
+    printf '{"status":"active"}\n'
+  fi
+  exit 0
+fi
+
+if [[ "${1:-}" == "delete" ]]; then
+  name="${2:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "VM not found"
+  virsh -c qemu:///system destroy "$name" >/dev/null 2>&1 || true
+  virsh -c qemu:///system undefine "$name" --nvram >/dev/null 2>&1 || virsh -c qemu:///system undefine "$name" >/dev/null
+  rm -rf -- "$ROOT/instances/$name"
+  sync_gateway
+  printf '{"name":"%s","status":"deleted"}\n' "$name"
+  exit 0
+fi
+
+if [[ "${1:-}" == "metrics" ]]; then
+  name="${2:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "VM not found"
+  stats=$(virsh -c qemu:///system domstats "$name" --cpu-total --balloon --vcpu --interface)
+  cpu_time=$(printf '%s\n' "$stats" | awk -F= '$1=="  cpu.time" {print $2; exit}')
+  vcpus=$(printf '%s\n' "$stats" | awk -F= '$1=="  vcpu.current" {print $2; exit}')
+  current=$(printf '%s\n' "$stats" | awk -F= '$1=="  balloon.current" {print $2; exit}')
+  unused=$(printf '%s\n' "$stats" | awk -F= '$1=="  balloon.unused" {print $2; exit}')
+  rx_bytes=$(printf '%s\n' "$stats" | awk -F= '$1=="  net.0.rx.bytes" {print $2; exit}')
+  tx_bytes=$(printf '%s\n' "$stats" | awk -F= '$1=="  net.0.tx.bytes" {print $2; exit}')
+  state=$(virsh -c qemu:///system domstate "$name" | tr '[:upper:]' '[:lower:]' | xargs)
+  ip=$(virsh -c qemu:///system domifaddr "$name" --source lease 2>/dev/null | awk '/ipv4/ {split($4,a,"/"); print a[1]; exit}')
+  disk_pair=$(virsh -c qemu:///system qemu-agent-command "$name" '{"execute":"guest-get-fsinfo"}' 2>/dev/null | python3 -c 'import json,sys; data=json.load(sys.stdin).get("return",[]); root=next((x for x in data if x.get("mountpoint")=="/"),{}); print(root.get("used-bytes",0),root.get("total-bytes",0))' 2>/dev/null || printf '0 0')
+  read -r disk_used disk_total <<<"$disk_pair"
+  printf '{"name":"%s","status":"%s","cpuTime":%s,"vcpus":%s,"currentKiB":%s,"unusedKiB":%s,"rxBytes":%s,"txBytes":%s,"diskUsedBytes":%s,"diskTotalBytes":%s,"ip":"%s"}\n' "$name" "$state" "${cpu_time:-0}" "${vcpus:-1}" "${current:-0}" "${unused:-0}" "${rx_bytes:-0}" "${tx_bytes:-0}" "${disk_used:-0}" "${disk_total:-0}" "$ip"
+  exit 0
+fi
+
+if [[ "${1:-}" == "route" ]]; then
+  name="${2:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "Node not found"
+  spec="$ROOT/instances/$name/spec"
+  [[ -f "$spec" ]] || fail "Node specification not found"
+  template=$(awk -F= '$1=="template" {print $2}' "$spec")
+  case "$template" in node|nginx|python) ;; *) fail "Node does not expose an HTTP service";; esac
+  state=$(virsh -c qemu:///system domstate "$name" | tr '[:upper:]' '[:lower:]' | xargs)
+  ip=$(virsh -c qemu:///system domifaddr "$name" --source lease 2>/dev/null | awk '/ipv4/ {split($4,a,"/"); print a[1]; exit}')
+  printf '{"name":"%s","status":"%s","template":"%s","ip":"%s","port":80}\n' "$name" "$state" "$template" "$ip"
+  exit 0
+fi
+
+if [[ "${1:-}" == "upgrade" ]]; then
+  name="${2:-}"
+  new_cpu="${3:-}"
+  new_ram="${4:-}"
+  new_disk="${5:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  case "$new_cpu" in .5|0.5|1|1.5|2|2.5|3|3.5|4) ;; *) fail "CPU must be between 0.5 and 4 vCPU";; esac
+  new_ram_mb=$(awk -v value="$new_ram" 'BEGIN { result=value*1024; if (result < 512 || result > 12288 || result % 512 != 0) exit 1; printf "%.0f", result }') || fail "RAM must be between 0.5 and 12 GB"
+  [[ "$new_disk" =~ ^[0-9]+$ ]] && (( new_disk >= 20 && new_disk <= 500 )) || fail "Storage must be between 20 and 500 GB"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "VM not found"
+  spec="$ROOT/instances/$name/spec"
+  [[ -f "$spec" ]] || fail "VM specification not found"
+  current_cpu=$(awk -F= '$1=="cpu" {print $2}' "$spec")
+  current_ram=$(awk -F= '$1=="ram" {print $2}' "$spec")
+  current_disk=$(awk -F= '$1=="disk" {print $2}' "$spec")
+  awk -v old="$current_cpu" -v new="$new_cpu" 'BEGIN { exit !(new >= old) }' || fail "CPU cannot be reduced"
+  awk -v old="$current_ram" -v new="$new_ram" 'BEGIN { exit !(new >= old) }' || fail "RAM cannot be reduced"
+  (( new_disk >= current_disk )) || fail "Storage cannot be reduced"
+  awk -v oc="$current_cpu" -v nc="$new_cpu" -v oram="$current_ram" -v nram="$new_ram" -v od="$current_disk" -v nd="$new_disk" 'BEGIN { exit !((nc > oc) || (nram > oram) || (nd > od)) }' || fail "Choose at least one larger resource"
+
+  exec 9>"$ROOT/.provision.lock"
+  flock -x 9
+  allocated_cpu=$(awk -F= '$1=="cpu" { total+=$2 } END { print total+0 }' "$ROOT"/instances/*/spec 2>/dev/null || true)
+  allocated_ram=$(awk -F= '$1=="ram" { total+=$2 } END { print total+0 }' "$ROOT"/instances/*/spec 2>/dev/null || true)
+  awk -v used="$allocated_cpu" -v old="$current_cpu" -v requested="$new_cpu" 'BEGIN { exit !((used-old+requested) <= 4) }' || fail "Host capacity exceeded: maximum 4 allocated vCPU"
+  awk -v used="$allocated_ram" -v old="$current_ram" -v requested="$new_ram" 'BEGIN { exit !((used-old+requested) <= 12) }' || fail "Host capacity exceeded: maximum 12 GB allocated RAM"
+
+  state=$(virsh -c qemu:///system domstate "$name" | tr '[:upper:]' '[:lower:]' | xargs)
+  if (( new_disk > current_disk )); then
+    if [[ "$state" == "running" ]]; then
+      virsh -c qemu:///system blockresize "$name" vda "${new_disk}G" >/dev/null
+    else
+      qemu-img resize -q "$ROOT/instances/$name/disk.qcow2" "${new_disk}G"
+    fi
+  fi
+  if [[ "$state" == "running" && "$new_disk" -gt "$current_disk" ]]; then
+    python3 - "$name" <<'PY' || true
+import json, subprocess, sys, time
+name=sys.argv[1]
+def agent(payload):
+    p=subprocess.run(['virsh','-c','qemu:///system','qemu-agent-command',name,json.dumps(payload,separators=(',',':'))],capture_output=True,text=True,timeout=5,check=True)
+    return json.loads(p.stdout)
+command='growpart /dev/vda 1 >/dev/null 2>&1 || true; resize2fs /dev/vda1 >/dev/null 2>&1 || true'
+pid=agent({'execute':'guest-exec','arguments':{'path':'/bin/bash','arg':['-lc',command],'capture-output':True}})['return']['pid']
+for _ in range(80):
+    if agent({'execute':'guest-exec-status','arguments':{'pid':pid}})['return'].get('exited'): break
+    time.sleep(.25)
+PY
+  fi
+
+  resources_changed=$(awk -v oc="$current_cpu" -v nc="$new_cpu" -v oram="$current_ram" -v nram="$new_ram" 'BEGIN { print ((nc != oc) || (nram != oram)) ? 1 : 0 }')
+  if [[ "$resources_changed" == "1" ]]; then
+    was_running=0
+    if [[ "$state" == "running" ]]; then
+      was_running=1
+      virsh -c qemu:///system shutdown "$name" >/dev/null
+      for _ in $(seq 1 60); do
+        [[ "$(virsh -c qemu:///system domstate "$name" 2>/dev/null | tr '[:upper:]' '[:lower:]' | xargs)" == "shut off" ]] && break
+        sleep 1
+      done
+      [[ "$(virsh -c qemu:///system domstate "$name" 2>/dev/null | tr '[:upper:]' '[:lower:]' | xargs)" == "shut off" ]] || virsh -c qemu:///system destroy "$name" >/dev/null
+    fi
+    xml_file=$(mktemp /tmp/vyron-upgrade-XXXXXX.xml)
+    virsh -c qemu:///system dumpxml "$name" >"$xml_file"
+    python3 - "$xml_file" "$new_cpu" "$new_ram_mb" <<'PY'
+import math, sys, xml.etree.ElementTree as ET
+path, cpu, ram_mb = sys.argv[1], float(sys.argv[2]), int(sys.argv[3])
+tree = ET.parse(path)
+root = tree.getroot()
+ram_kib = ram_mb * 1024
+for tag in ('memory', 'currentMemory'):
+    node = root.find(tag)
+    if node is None:
+        node = ET.SubElement(root, tag)
+    node.set('unit', 'KiB')
+    node.text = str(ram_kib)
+vcpu = root.find('vcpu')
+if vcpu is None:
+    vcpu = ET.SubElement(root, 'vcpu')
+vcpu.set('placement', 'static')
+vcpu.text = str(max(1, math.ceil(cpu)))
+cputune = root.find('cputune')
+if cputune is None:
+    cputune = ET.SubElement(root, 'cputune')
+period = cputune.find('period')
+if period is None:
+    period = ET.SubElement(cputune, 'period')
+period.text = '100000'
+quota = cputune.find('quota')
+if quota is None:
+    quota = ET.SubElement(cputune, 'quota')
+quota.text = str(round(cpu * 100000))
+tree.write(path, encoding='unicode')
+PY
+    virsh -c qemu:///system define "$xml_file" >/dev/null
+    rm -f "$xml_file"
+    upgraded_vcpus=$(awk -v value="$new_cpu" 'BEGIN { value=int(value+0.99); if(value<1)value=1; print value }')
+    pin_vm_cpus "$name" "$upgraded_vcpus"
+    if [[ "$was_running" == "1" ]]; then
+      virsh -c qemu:///system start "$name" >/dev/null
+      pin_vm_cpus "$name" "$upgraded_vcpus"
+      state="running"
+    else
+      state="stopped"
+    fi
+  fi
+  awk -F= -v cpu="$new_cpu" -v ram="$new_ram" -v disk="$new_disk" 'BEGIN{OFS="="} $1=="cpu"{$2=cpu} $1=="ram"{$2=ram} $1=="disk"{$2=disk} {print}' "$spec" >"$spec.tmp"
+  mv "$spec.tmp" "$spec"
+  chmod 0600 "$spec"
+  case "$state" in
+    running|idle|blocked) state="running" ;;
+    "shut off") state="stopped" ;;
+    "in shutdown") state="stopping" ;;
+  esac
+  printf '{"name":"%s","status":"%s","cpu":%s,"ram":%s,"disk":%s}\n' "$name" "$state" "$new_cpu" "$new_ram" "$new_disk"
+  exit 0
+fi
+
+if [[ "${1:-}" == "upload" ]]; then
+  name="${2:-}"
+  upload="${3:-}"
+  scope="${4:-}"
+  encoded_path="${5:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  [[ "$upload" =~ ^/tmp/vyron-file-[a-f0-9-]+\.bin$ && -f "$upload" && ! -L "$upload" ]] || fail "Invalid upload"
+  [[ "$scope" == "project" || "$scope" == "user" || "$scope" == "minecraft" ]] || fail "Invalid file scope"
+  [[ "$encoded_path" =~ ^[A-Za-z0-9+/=]+$ ]] && (( ${#encoded_path} <= 600 )) || fail "Invalid file path"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "VM not found"
+  python3 - "$name" "$upload" "$scope" "$encoded_path" <<'PY'
+import base64, json, pathlib, posixpath, shlex, subprocess, sys, time
+name, upload, scope, encoded = sys.argv[1:]
+relative = base64.b64decode(encoded, validate=True).decode('utf-8').replace('\\', '/')
+relative = posixpath.normpath(relative).lstrip('/')
+if not relative or relative == '.' or relative.startswith('../') or '/..' in relative or len(relative) > 240:
+    raise RuntimeError('Invalid upload path')
+root = '/srv/vyron/app' if scope == 'project' else '/srv/minecraft' if scope == 'minecraft' else '/home/vyron/files'
+owner = 'root:root' if scope == 'minecraft' else 'vyron:vyron'
+target = f'{root}/{relative}'
+def agent(payload):
+    process = subprocess.run(['virsh','-c','qemu:///system','qemu-agent-command',name,json.dumps(payload,separators=(',',':'))], capture_output=True, text=True, timeout=10)
+    if process.returncode:
+        raise RuntimeError(process.stderr.strip() or 'Guest Agent is not ready')
+    result = json.loads(process.stdout)
+    if 'error' in result:
+        raise RuntimeError(result['error'].get('desc', 'Guest Agent command failed'))
+    return result
+def execute(command):
+    pid = agent({'execute':'guest-exec','arguments':{'path':'/bin/bash','arg':['-lc',command],'capture-output':True}})['return']['pid']
+    for _ in range(120):
+        status = agent({'execute':'guest-exec-status','arguments':{'pid':pid}})['return']
+        if status.get('exited'):
+            if status.get('exitcode', 1): raise RuntimeError('Could not prepare upload directory')
+            return
+        time.sleep(.1)
+    raise RuntimeError('Guest command timed out')
+execute(f'mkdir -p -- {shlex.quote(posixpath.dirname(target))}')
+handle = agent({'execute':'guest-file-open','arguments':{'path':target,'mode':'wb'}})['return']
+try:
+    with open(upload, 'rb') as source:
+        while chunk := source.read(49152):
+            offset = 0
+            while offset < len(chunk):
+                result = agent({'execute':'guest-file-write','arguments':{'handle':handle,'buf-b64':base64.b64encode(chunk[offset:]).decode()}})['return']
+                written = int(result.get('count', 0))
+                if written <= 0:
+                    raise RuntimeError('Guest stopped accepting upload data')
+                offset += written
+finally:
+    agent({'execute':'guest-file-close','arguments':{'handle':handle}})
+execute(f'chown {owner} -- {shlex.quote(target)}')
+print(json.dumps({'path':relative,'size':pathlib.Path(upload).stat().st_size,'uploaded':True}))
+PY
+  exit 0
+fi
+
+if [[ "${1:-}" == "ssh-password-reset" ]]; then
+  name="${2:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "VM not found"
+  password=$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)
+  password_hash=$(openssl passwd -6 "$password")
+  command=$(cat <<EOF
+set -e
+id vyron >/dev/null 2>&1 || useradd -m -s /bin/bash -G adm,sudo vyron
+usermod -p '$password_hash' vyron
+usermod -U vyron
+install -d -m 0755 /etc/ssh/sshd_config.d /run/sshd
+printf '%s\\n' 'PasswordAuthentication yes' 'KbdInteractiveAuthentication yes' 'UsePAM yes' 'PermitRootLogin no' > /etc/ssh/sshd_config.d/99-vyron-password-auth.conf
+chmod 0644 /etc/ssh/sshd_config.d/99-vyron-password-auth.conf
+command -v sshd >/dev/null 2>&1 || { export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y openssh-server; }
+sshd -t
+systemctl enable --now ssh
+systemctl restart ssh
+EOF
+)
+  encoded=$(printf '%s' "$command" | base64 -w0)
+  result=$("$0" exec "$name" "$encoded" Lw==)
+  [[ "$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("exitCode", 1))' <<<"$result")" == "0" ]] || { printf '%s\n' "$result" >&2; fail "SSH password could not be enabled"; }
+  printf '{"name":"%s","username":"vyron","initialPassword":"%s","status":"active"}\n' "$name" "$password"
+  exit 0
+fi
+
+if [[ "${1:-}" == "exec" ]]; then
+  name="${2:-}"
+  encoded="${3:-}"
+  encoded_cwd="${4:-L3Jvb3Q=}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  [[ "$encoded" =~ ^[A-Za-z0-9+/=]+$ ]] && (( ${#encoded} <= 150000 )) || fail "Invalid command"
+  [[ "$encoded_cwd" =~ ^[A-Za-z0-9+/=]+$ ]] && (( ${#encoded_cwd} <= 600 )) || fail "Invalid working directory"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "VM not found"
+  python3 - "$name" "$encoded" "$encoded_cwd" <<'PY'
+import base64, json, re, shlex, subprocess, sys, time
+name, encoded, encoded_cwd = sys.argv[1], sys.argv[2], sys.argv[3]
+command = base64.b64decode(encoded, validate=True).decode('utf-8')
+cwd = base64.b64decode(encoded_cwd, validate=True).decode('utf-8')
+if not cwd.startswith('/') or len(cwd) > 300 or '..' in cwd or any(ord(x) < 32 for x in cwd):
+    raise RuntimeError('Invalid working directory')
+wrapped = f"cd -- {shlex.quote(cwd)} || exit 1\n{command}\nvyron_code=$?\nprintf '\\n__VYRON_CWD__=%s\\n' \"$PWD\"\nexit $vyron_code"
+def agent(payload):
+    process = subprocess.run(['virsh','-c','qemu:///system','qemu-agent-command',name,json.dumps(payload,separators=(',',':'))], capture_output=True, text=True, timeout=5)
+    if process.returncode:
+        raise RuntimeError(process.stderr.strip() or 'Guest Agent is not ready')
+    result = json.loads(process.stdout)
+    if 'error' in result:
+        raise RuntimeError(result['error'].get('desc', 'Guest Agent command failed'))
+    return result
+for attempt in range(180):
+    try:
+        agent({'execute':'guest-ping'})
+        break
+    except Exception:
+        if attempt == 179:
+            raise RuntimeError('Guest Agent did not become ready within 6 minutes')
+        time.sleep(2)
+for launch_attempt in range(90):
+    try:
+        started = agent({'execute':'guest-exec','arguments':{'path':'/bin/bash','arg':['-lc',wrapped],'capture-output':True}})
+        break
+    except Exception:
+        if launch_attempt == 89:
+            raise RuntimeError('Guest Agent did not stay available long enough to start the command')
+        time.sleep(2)
+pid = started['return']['pid']
+status_failures = 0
+for _ in range(1800):
+    try:
+        status = agent({'execute':'guest-exec-status','arguments':{'pid':pid}})['return']
+        status_failures = 0
+    except Exception:
+        status_failures += 1
+        if status_failures >= 90:
+            raise RuntimeError('Guest Agent connection was lost while the command was running')
+        time.sleep(2)
+        continue
+    if status.get('exited'):
+        def decode(key):
+            raw = status.get(key, '')
+            return base64.b64decode(raw).decode('utf-8', errors='replace')[:65536] if raw else ''
+        output = decode('out-data')
+        marker = re.search(r'\n?__VYRON_CWD__=(/[^\r\n]*)\n?$', output)
+        resulting_cwd = marker.group(1) if marker else cwd
+        if marker:
+            output = output[:marker.start()].rstrip('\n')
+        print(json.dumps({'exitCode':status.get('exitcode',-1),'stdout':output,'stderr':decode('err-data'),'cwd':resulting_cwd}))
+        sys.exit(0)
+    time.sleep(.25)
+raise RuntimeError('Guest command did not finish within 7.5 minutes')
+PY
+  exit 0
+fi
+
+if [[ "${1:-}" == "deploy" ]]; then
+  name="${2:-}"
+  archive="${3:-}"
+  template="${4:-}"
+  entry_file="${5:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  [[ "$archive" =~ ^/tmp/vyron-upload-[a-f0-9-]+\.zip$ ]] || fail "Invalid upload path"
+  [[ -f "$archive" && ! -L "$archive" ]] || fail "Upload not found"
+  [[ "$template" == "node" || "$template" == "nginx" ]] || fail "Invalid deployment template"
+  [[ "$entry_file" =~ ^[A-Za-z0-9._/-]{1,240}$ && "$entry_file" != /* && "$entry_file" != *".."* ]] || fail "Invalid deployment entry file"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "Node not found"
+  [[ "$(virsh -c qemu:///system domstate "$name" | xargs)" == "running" ]] || fail "Node must be running"
+  spec="$ROOT/instances/$name/spec"
+  [[ -f "$spec" ]] || fail "Node specification not found"
+  [[ "$(awk -F= '$1=="template" {print $2}' "$spec")" == "$template" ]] || fail "Deployment template does not match this node"
+
+  python3 - "$name" "$archive" "$template" "$entry_file" <<'PY'
+import base64, json, pathlib, shlex, subprocess, sys, time
+name, archive, template, entry_file = sys.argv[1:]
+
+def agent(payload, timeout=10):
+    process = subprocess.run(['virsh', '-c', 'qemu:///system', 'qemu-agent-command', name, json.dumps(payload, separators=(',', ':'))], capture_output=True, text=True, timeout=timeout)
+    if process.returncode:
+        raise RuntimeError(process.stderr.strip() or 'Guest Agent is not ready')
+    result = json.loads(process.stdout)
+    if 'error' in result:
+        raise RuntimeError(result['error'].get('desc', 'Guest Agent command failed'))
+    return result
+
+for attempt in range(180):
+    try:
+        agent({'execute': 'guest-ping'})
+        break
+    except Exception:
+        if attempt == 179:
+            raise RuntimeError('Guest Agent did not become ready in time')
+        time.sleep(2)
+remote = '/tmp/vyron-deployment.zip'
+handle = agent({'execute': 'guest-file-open', 'arguments': {'path': remote, 'mode': 'wb'}})['return']
+try:
+    with open(archive, 'rb') as source:
+        while chunk := source.read(49152):
+            agent({'execute': 'guest-file-write', 'arguments': {'handle': handle, 'buf-b64': base64.b64encode(chunk).decode()}})
+finally:
+    agent({'execute': 'guest-file-close', 'arguments': {'handle': handle}})
+
+common = r'''
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+cloud-init status --wait >/dev/null 2>&1 || true
+command -v unzip >/dev/null || { apt-get update -qq; apt-get install -y -qq unzip; }
+rm -rf /tmp/vyron-unpack /srv/vyron/app.new
+mkdir -p /tmp/vyron-unpack /srv/vyron/app.new
+unzip -oq /tmp/vyron-deployment.zip -d /tmp/vyron-unpack
+shopt -s dotglob nullglob
+entries=(/tmp/vyron-unpack/*)
+source=/tmp/vyron-unpack
+if [ "${#entries[@]}" -eq 1 ] && [ -d "${entries[0]}" ]; then source="${entries[0]}"; fi
+cp -a "$source"/. /srv/vyron/app.new/
+rm -rf /srv/vyron/app
+mv /srv/vyron/app.new /srv/vyron/app
+rm -rf /tmp/vyron-unpack /tmp/vyron-deployment.zip
+'''
+if template == 'node':
+    command = common + 'entry_file=' + shlex.quote(entry_file) + r'''
+test -f "/srv/vyron/app/$entry_file" || { echo "Selected start file $entry_file is missing"; exit 2; }
+node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+if [ "$node_major" -lt 20 ]; then
+  apt-get update -qq
+  apt-get install -y -qq ca-certificates curl
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  apt-get install -y -qq nodejs
+fi
+chown -R vyron:vyron /srv/vyron/app
+cd /srv/vyron/app
+if [ -f package.json ]; then
+  if [ -d node_modules ] && sudo -u vyron node -e "const p=require('./package.json');for(const n of Object.keys({...p.dependencies,...p.devDependencies}))require.resolve(n)"; then
+    echo 'Existing node_modules verified'
+  elif [ -f package-lock.json ]; then
+    sudo -u vyron npm ci --include=dev || sudo -u vyron npm install --include=dev
+  else
+    sudo -u vyron npm install --include=dev
+  fi
+fi
+cat >/etc/systemd/system/vyron-node.service <<'EOF'
+[Unit]
+Description=Vyron Node.js deployment
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+[Service]
+Type=simple
+User=vyron
+WorkingDirectory=/srv/vyron/app
+EnvironmentFile=-/etc/vyron-node.env
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/node /srv/vyron/app/ENTRY_FILE
+Restart=on-failure
+RestartSec=3
+[Install]
+WantedBy=multi-user.target
+EOF
+sed -i "s|ENTRY_FILE|$entry_file|" /etc/systemd/system/vyron-node.service
+systemctl daemon-reload
+systemctl enable --now vyron-node
+systemctl restart vyron-node
+for attempt in {1..30}; do
+  app_port=""
+  while read -r candidate; do
+    if timeout 2 bash -c "exec 3<>/dev/tcp/127.0.0.1/${candidate}" 2>/dev/null; then app_port="$candidate"; break; fi
+  done < <(ss -H -ltnp | awk '/users:\(\("node"/ {port=$4; sub(/^.*:/,"",port); if(port ~ /^[0-9]+$/) {port=port+0; if(port > 1024 && port < 65536) print port}}' | sort -n -u)
+  if [ -n "${app_port:-}" ]; then break; fi
+  if [ "$attempt" -eq 30 ]; then journalctl -u vyron-node -n 30 --no-pager >&2; exit 4; fi
+  sleep 1
+done
+systemctl is-active --quiet vyron-node || { journalctl -u vyron-node -n 40 --no-pager >&2; exit 5; }
+curl -sS --max-time 8 "http://127.0.0.1:${app_port}/" >/dev/null || { journalctl -u vyron-node -n 40 --no-pager >&2; exit 6; }
+cat >/etc/nginx/sites-available/vyron-node <<EOF
+server {
+  listen 80 default_server;
+  server_name _;
+  location / {
+    proxy_pass http://127.0.0.1:${app_port};
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+  }
+}
+EOF
+printf '%s\n' "$app_port" >/etc/vyron-app-port
+rm -f /etc/nginx/sites-enabled/default
+ln -sfn /etc/nginx/sites-available/vyron-node /etc/nginx/sites-enabled/vyron-node
+nginx -t
+systemctl enable --now nginx
+systemctl reload nginx
+echo "VYRON_APP_PORT=${app_port}"
+'''
+else:
+    command = common + 'entry_file=' + shlex.quote(entry_file) + r'''
+test -f "/srv/vyron/app/$entry_file" || { echo "Selected main page $entry_file is missing"; exit 2; }
+cat >/etc/nginx/sites-available/vyron-static <<'EOF'
+server {
+  listen 80 default_server;
+  server_name _;
+  root /srv/vyron/app;
+  index ENTRY_FILE;
+  location / { try_files $uri $uri/ /ENTRY_FILE; }
+}
+EOF
+sed -i "s|ENTRY_FILE|$entry_file|g" /etc/nginx/sites-available/vyron-static
+rm -f /etc/nginx/sites-enabled/default
+ln -sfn /etc/nginx/sites-available/vyron-static /etc/nginx/sites-enabled/vyron-static
+nginx -t
+systemctl enable --now nginx
+systemctl reload nginx
+curl -fsS --max-time 5 http://127.0.0.1/ >/dev/null
+'''
+
+started = agent({'execute': 'guest-exec', 'arguments': {'path': '/bin/bash', 'arg': ['-lc', command], 'capture-output': True}})
+pid = started['return']['pid']
+for _ in range(2400):
+    status = agent({'execute': 'guest-exec-status', 'arguments': {'pid': pid}})['return']
+    if status.get('exited'):
+        def decode(key):
+            raw = status.get(key, '')
+            return base64.b64decode(raw).decode('utf-8', errors='replace')[-65536:] if raw else ''
+        if status.get('exitcode', -1) != 0:
+            raise RuntimeError((decode('err-data') or decode('out-data') or 'Deployment failed').strip())
+        output = decode('out-data')
+        import re
+        match = re.search(r'VYRON_APP_PORT=(\d+)', output)
+        print(json.dumps({'name': name, 'status': 'deployed', 'template': template, 'port': 80, 'appPort': int(match.group(1)) if match else 80}))
+        sys.exit(0)
+    time.sleep(.25)
+raise RuntimeError('Deployment timed out')
+PY
+  exit 0
+fi
+
+if [[ "${1:-}" == "console" ]]; then
+  name="${2:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "VM not found"
+  exec virsh -c qemu:///system console "$name" --force
+fi
+
+if [[ "${1:-}" == "status" ]]; then
+  name="${2:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "VM not found"
+  raw=$(virsh -c qemu:///system domstate "$name" 2>/dev/null | tr '[:upper:]' '[:lower:]' | xargs)
+  case "$raw" in
+    running|idle|blocked) status="running" ;;
+    "in shutdown") status="stopping" ;;
+    "shut off") status="stopped" ;;
+    paused) status="paused" ;;
+    crashed) status="failed" ;;
+    "pmsuspended") status="suspended" ;;
+    *) status="unknown" ;;
+  esac
+  printf '{"name":"%s","status":"%s","hypervisorState":"%s"}\n' "$name" "$status" "$raw"
+  exit 0
+fi
+
+if [[ "${1:-}" == "start" || "${1:-}" == "stop" ]]; then
+  action="$1"
+  name="${2:-}"
+  [[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+  virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 || fail "VM not found"
+  if [[ "$action" == "start" ]]; then
+    virsh -c qemu:///system start "$name" >/dev/null
+    status="running"
+  else
+    virsh -c qemu:///system shutdown "$name" >/dev/null
+    status="stopping"
+  fi
+  printf '{"name":"%s","status":"%s"}\n' "$name" "$status"
+  exit 0
+fi
+
+[[ "${1:-}" == "create" ]] || fail "Unsupported action"
+name="${2:-}"; cpu="${3:-}"; ram="${4:-}"; disk="${5:-}"; template="${6:-ubuntu}"
+[[ "$name" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || fail "Invalid name"
+case "$cpu" in .5|0.5|1|1.5|2|2.5|3|3.5|4) ;; *) fail "Invalid CPU";; esac
+case "$template" in ubuntu|node|nginx|python) ;; *) fail "Invalid template";; esac
+ram_mb=$(awk -v value="$ram" 'BEGIN { result=value*1024; if (result < 512 || result > 12288 || result % 512 != 0) exit 1; printf "%.0f", result }') || fail "Invalid RAM"
+[[ "$disk" =~ ^[0-9]+$ ]] && (( disk >= 20 && disk <= 500 )) && { (( disk == 20 )) || (( disk % 100 == 0 )); } || fail "Invalid disk"
+[[ -f "$BASE" ]] || fail "Base image unavailable"
+virsh -c qemu:///system dominfo "$name" >/dev/null 2>&1 && fail "VM already exists"
+
+# Serialize provisioning and keep host x1 inside its safe allocatable capacity.
+exec 9>"$ROOT/.provision.lock"
+flock -x 9
+allocated_cpu=$(awk -F= '$1=="cpu" { total+=$2 } END { print total+0 }' "$ROOT"/instances/*/spec 2>/dev/null || true)
+allocated_ram=$(awk -F= '$1=="ram" { total+=$2 } END { print total+0 }' "$ROOT"/instances/*/spec 2>/dev/null || true)
+awk -v used="$allocated_cpu" -v requested="$cpu" 'BEGIN { exit !((used+requested) <= 4) }' || fail "Host capacity exceeded: maximum 4 allocated vCPU"
+awk -v used="$allocated_ram" -v requested="$ram" 'BEGIN { exit !((used+requested) <= 12) }' || fail "Host capacity exceeded: maximum 12 GB allocated RAM"
+
+vm_dir="$ROOT/instances/$name"
+install -d -m 0755 "$vm_dir"
+qemu-img create -q -f qcow2 -F qcow2 -b "$BASE" "$vm_dir/disk.qcow2" "${disk}G"
+chmod 0644 "$vm_dir/disk.qcow2"
+password=$(openssl rand -base64 15 | tr -d '/+=' | head -c 16)
+password_hash=$(openssl passwd -6 "$password")
+vcpus=$(awk -v value="$cpu" 'BEGIN { value=int(value+0.99); if(value<1)value=1; print value }')
+
+packages="qemu-guest-agent,curl,openssh-server"
+runcmd=""
+case "$template" in
+  nginx) packages="$packages,nginx,unzip"; runcmd="  - [ systemctl, enable, --now, nginx ]" ;;
+  node) packages="$packages,nodejs,npm,nginx,unzip"; runcmd="  - [ systemctl, enable, --now, nginx ]" ;;
+  python) packages="$packages,python3,python3-venv,nginx"; runcmd="  - [ systemctl, enable, --now, nginx ]" ;;
+esac
+
+cat >"$vm_dir/user-data" <<EOF
+#cloud-config
+hostname: $name
+manage_etc_hosts: true
+users:
+  - name: vyron
+    groups: [adm, sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: false
+    passwd: $password_hash
+ssh_pwauth: true
+chpasswd:
+  expire: false
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-vyron-password-auth.conf
+    owner: root:root
+    permissions: '0644'
+    content: |
+      PasswordAuthentication yes
+      KbdInteractiveAuthentication yes
+      UsePAM yes
+      PermitRootLogin no
+package_update: true
+packages: [${packages}]
+runcmd:
+  - [ systemctl, enable, --now, qemu-guest-agent ]
+  - [ install, -d, -m, '0755', /run/sshd ]
+  - [ systemctl, enable, --now, ssh ]
+  - [ systemctl, restart, ssh ]
+${runcmd}
+EOF
+cat >"$vm_dir/meta-data" <<EOF
+instance-id: vyron-$name
+local-hostname: $name
+EOF
+chmod 0600 "$vm_dir/user-data" "$vm_dir/meta-data"
+cloud-localds "$vm_dir/seed.iso" "$vm_dir/user-data" "$vm_dir/meta-data"
+chmod 0644 "$vm_dir/seed.iso"
+
+virt-install --connect qemu:///system --name "$name" --memory "$ram_mb" --vcpus "$vcpus" \
+  --cpu host-passthrough --import --os-variant ubuntu24.04 --graphics none --noautoconsole \
+  --disk "path=$vm_dir/disk.qcow2,format=qcow2,bus=virtio" \
+  --disk "path=$vm_dir/seed.iso,device=cdrom" --network network=default,model=virtio
+
+cpu_quota=$(awk -v value="$cpu" 'BEGIN { printf "%.0f", value*100000 }')
+virsh -c qemu:///system schedinfo "$name" --set vcpu_period=100000 --set vcpu_quota="$cpu_quota" --config >/dev/null
+virsh -c qemu:///system schedinfo "$name" --set vcpu_period=100000 --set vcpu_quota="$cpu_quota" --live >/dev/null
+pin_vm_cpus "$name" "$vcpus"
+
+printf 'cpu=%s\nram=%s\ndisk=%s\ntemplate=%s\n' "$cpu" "$ram" "$disk" "$template" > "$vm_dir/spec"
+chmod 0600 "$vm_dir/spec"
+sync_gateway
+
+printf '{"name":"%s","username":"vyron","initialPassword":"%s","status":"running"}\n' "$name" "$password"

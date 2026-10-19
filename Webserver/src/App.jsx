@@ -1696,17 +1696,27 @@ function LiveKvmTerminal({ vm }) {
 }
 
 function NodeWebsites({ vm, refresh }) {
-  const makeSlots = () => Array.from({ length: 5 }, (_, index) => {
-    const slot = index + 1;
-    const draft = vm.websiteDrafts?.find(item => Number(item.slot) === slot);
-    const deployed = vm.websites?.find(item => Number(item.slot) === slot);
-    const stored = draft || deployed;
-    return stored ? { slot, enabled: stored.enabled !== false, entryFile: stored.entryFile || "" } : { slot, enabled: slot === 1 && Boolean(vm.deployment?.entryFile), entryFile: slot === 1 ? vm.deployment?.entryFile || "" : "" };
-  });
-  const [websites, setWebsites] = useState(makeSlots), [busy, setBusy] = useState(""), [error, setError] = useState(""), [notice, setNotice] = useState("");
-  useEffect(() => { setWebsites(makeSlots()); setNotice(""); setError(""); }, [vm.id]);
+  const initialWebsites = () => {
+    const stored = Array.isArray(vm.websiteDrafts) ? vm.websiteDrafts : Array.isArray(vm.websites) ? vm.websites : [];
+    const configured = stored.filter(item => item.enabled !== false || item.entryFile).map(item => ({ slot: Number(item.slot), enabled: item.enabled !== false, entryFile: item.entryFile || "" })).filter(item => Number.isInteger(item.slot) && item.slot >= 1 && item.slot <= 5);
+    if (configured.length) return configured.sort((a, b) => a.slot - b.slot);
+    return vm.deployment?.entryFile ? [{ slot: 1, enabled: true, entryFile: vm.deployment.entryFile }] : [];
+  };
+  const [websites, setWebsites] = useState(initialWebsites), [busy, setBusy] = useState(""), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  useEffect(() => { setWebsites(initialWebsites()); setNotice(""); setError(""); }, [vm.id]);
   const hostname = vm.customDomains?.find(item => item.status === "active")?.domain || vm.domain;
   const update = (slot, patch) => setWebsites(current => current.map(item => item.slot === slot ? { ...item, ...patch } : item));
+  const addWebsite = () => {
+    const used = new Set(websites.map(item => Number(item.slot)));
+    const slot = [1, 2, 3, 4, 5].find(candidate => !used.has(candidate));
+    if (!slot) return;
+    setWebsites(current => [...current, { slot, enabled: true, entryFile: "" }].sort((a, b) => a.slot - b.slot));
+    setNotice(""); setError("");
+  };
+  const removeWebsite = slot => {
+    setWebsites(current => current.filter(item => item.slot !== slot));
+    setNotice("Website removed from the draft. Save the settings, then deploy to stop its process and route.");
+  };
   const submit = async (event, deploy = false) => {
     event?.preventDefault(); setBusy(deploy ? "deploy" : "save"); setError(""); setNotice("");
     try {
@@ -1717,8 +1727,8 @@ function NodeWebsites({ vm, refresh }) {
     finally { setBusy(""); }
   };
   return <form className="node-websites" onSubmit={event => submit(event, false)}>
-    <header><div><small>NODE.JS MULTI-SITE</small><h2>Five websites, one node</h2><p>Save your slot configuration first, then deploy it when the new website files are ready.</p></div><div className="website-actions"><button type="submit" disabled={Boolean(busy)}><Save /> {busy === "save" ? "Saving…" : "Save websites"}</button><button type="button" className="deploy-websites" disabled={Boolean(busy) || vm.status !== "running"} onClick={event => submit(event, true)}><Play /> {busy === "deploy" ? "Deploying…" : "Deploy websites"}</button></div></header>
-    <div className="node-website-list">{websites.map(site => {
+    <header><div><small>NODE.JS MULTI-SITE</small><h2>Multiple websites, one node</h2><p>Add websites as needed, save their start files, then deploy the new configuration.</p></div><div className="website-actions"><button type="button" className="add-website" disabled={Boolean(busy) || websites.length >= 5} onClick={addWebsite}><Plus /> {websites.length >= 5 ? "Five websites added" : "Add website"}</button><button type="submit" disabled={Boolean(busy)}><Save /> {busy === "save" ? "Saving…" : "Save websites"}</button><button type="button" className="deploy-websites" disabled={Boolean(busy) || vm.status !== "running"} onClick={event => submit(event, true)}><Play /> {busy === "deploy" ? "Deploying…" : "Deploy websites"}</button></div></header>
+    {websites.length ? <div className="node-website-list">{websites.map(site => {
       const active = vm.websites?.some(item => Number(item.slot) === site.slot);
       const slotDomain = vm.customDomains?.find(item => Number(item.websiteSlot) === site.slot && item.status === "active")?.domain;
       const address = slotDomain ? `https://${slotDomain}` : `https://${hostname}/${site.slot}`;
@@ -1728,8 +1738,9 @@ function NodeWebsites({ vm, refresh }) {
         <label><span>Start file</span><input value={site.entryFile} onChange={event => update(site.slot, { entryFile: event.target.value })} disabled={!site.enabled || Boolean(busy)} placeholder={`sites/${site.slot}/server.js`} /></label>
         {active ? <a href={address} target="_blank" rel="noreferrer"><Globe2 /> Open /{site.slot}</a> : <span className="website-pending">/{site.slot}</span>}
         <label className="website-switch"><input type="checkbox" checked={site.enabled} disabled={Boolean(busy)} onChange={event => update(site.slot, { enabled: event.target.checked })} /><i /><span>{site.enabled ? "Enabled" : "Disabled"}</span></label>
+        <button type="button" className="website-remove" disabled={Boolean(busy)} onClick={() => removeWebsite(site.slot)} aria-label={`Remove website ${site.slot}`}><Trash2 /></button>
       </article>;
-    })}</div>
+    })}</div> : <div className="node-websites-empty"><Globe2 /><strong>No websites configured</strong><span>Click Add website to create your first website slot.</span><button type="button" disabled={Boolean(busy)} onClick={addWebsite}><Plus /> Add website</button></div>}
     <footer><span><FileCode2 /><b>How it works</b> Upload every project into a separate folder in Files, then enter its start file here—for example <code>sites/2/server.js</code>.</span><span><Network /><b>Routes</b> Vyron configures Nginx, ports, process restarts and paths automatically.</span></footer>
     {notice && <div className="vh-success"><Check /> {notice}</div>}
     {error && <div className="vh-error">{error}</div>}

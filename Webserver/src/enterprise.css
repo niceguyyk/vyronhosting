@@ -3167,14 +3167,15 @@
 .node-websites > header small { color: #9c7bf2; font-size: 8px; font-weight: 700; letter-spacing: 1.4px; }
 .node-websites > header h2 { margin: 7px 0 4px; font-size: 19px; }
 .node-websites > header p { margin: 0; color: #858890; font-size: 9px; }
-.website-actions { display: flex; align-items: center; gap: 8px; }
+.website-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .node-websites > header button { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border: 0; border-radius: 7px; color: white; background: #7959e8; font-size: 9px; font-weight: 650; }
 .node-websites > header button:not(.deploy-websites) { color: #cbc9d0; background: #292a2e; }
+.node-websites > header button.add-website { color: #bcaaf7; background: #2b2440; }
 .node-websites > header button.deploy-websites { background: linear-gradient(135deg, #7959e8, #6646d2); box-shadow: 0 8px 24px #6f50db2b; }
 .node-websites > header button svg { width: 13px; }
 .node-websites > header button:disabled { opacity: .45; }
 .node-website-list { display: grid; gap: 1px; background: #292a2e; }
-.node-website-list article { display: grid; grid-template-columns: 44px 130px minmax(220px, 1fr) 100px 96px; align-items: center; gap: 14px; min-height: 68px; padding: 10px 20px; background: #151618; transition: background .18s ease; }
+.node-website-list article { display: grid; grid-template-columns: 44px 130px minmax(220px, 1fr) 100px 96px 30px; align-items: center; gap: 14px; min-height: 68px; padding: 10px 20px; background: #151618; transition: background .18s ease; }
 .node-website-list article.enabled { background: #17161c; }
 .website-slot { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 9px; color: #8b8e95; background: #242529; font-size: 12px; font-weight: 750; }
 .node-website-list article.enabled .website-slot { color: #b9a5fa; background: #2d2445; box-shadow: inset 0 0 0 1px #493873; }
@@ -3194,6 +3195,15 @@
 .website-switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 9px; height: 9px; border-radius: 50%; background: #858890; transition: .18s; }
 .website-switch input:checked + i { background: #6549bd; }
 .website-switch input:checked + i::after { left: 16px; background: #fff; }
+.website-remove { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; color: #8d858d; background: #252225; }
+.website-remove:hover { color: #ff8292; background: #3a2228; }
+.website-remove svg { width: 12px; }
+.node-websites-empty { display: grid; place-items: center; gap: 7px; min-height: 210px; padding: 24px; color: #777a82; text-align: center; }
+.node-websites-empty > svg { width: 28px; color: #7259bd; }
+.node-websites-empty strong { color: #d7d4dc; font-size: 11px; }
+.node-websites-empty span { font-size: 8px; }
+.node-websites-empty button { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 9px 13px; border: 0; border-radius: 7px; color: #d9d0fa; background: #2b2440; font-size: 8px; }
+.node-websites-empty button svg { width: 12px; }
 .node-websites > footer { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 16px 20px; border-top: 1px solid #2b2c30; background: #121315; }
 .node-websites > footer span { display: grid; grid-template-columns: 18px auto 1fr; align-items: center; gap: 6px; color: #797c84; font-size: 8px; }
 .node-websites > footer svg { width: 13px; color: #9475eb; }
@@ -3202,7 +3212,7 @@
 .node-websites > .vh-success, .node-websites > .vh-error { margin: 12px 20px 18px; }
 .node-websites > .vh-success { display: flex; align-items: center; gap: 7px; padding: 10px; border: 1px solid #285743; border-radius: 7px; color: #65d7a1; background: #173127; font-size: 8px; }
 .node-websites > .vh-success svg { width: 12px; }
-@media (max-width: 1050px) { .node-website-list article { grid-template-columns: 40px 110px 1fr 85px; } .website-switch { grid-column: 2 / -1; } }
+@media (max-width: 1050px) { .node-websites > header { align-items: flex-start; flex-direction: column; } .website-actions { justify-content: flex-start; } .node-website-list article { grid-template-columns: 40px 110px 1fr 85px 30px; } .website-switch { grid-column: 2 / 5; } }
 .node-files > header { display: flex; justify-content: space-between; align-items: center; padding: 14px 17px; border-bottom: 1px solid #303136; }
 .node-files > header h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 11px; }
 .node-files > header h2 svg { width: 15px; color: #a087fa; }

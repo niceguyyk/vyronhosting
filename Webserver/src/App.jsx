@@ -1698,23 +1698,26 @@ function LiveKvmTerminal({ vm }) {
 function NodeWebsites({ vm, refresh }) {
   const makeSlots = () => Array.from({ length: 5 }, (_, index) => {
     const slot = index + 1;
-    const stored = vm.websites?.find(item => Number(item.slot) === slot);
-    return stored ? { slot, enabled: true, entryFile: stored.entryFile || "" } : { slot, enabled: slot === 1 && Boolean(vm.deployment?.entryFile), entryFile: slot === 1 ? vm.deployment?.entryFile || "" : "" };
+    const draft = vm.websiteDrafts?.find(item => Number(item.slot) === slot);
+    const deployed = vm.websites?.find(item => Number(item.slot) === slot);
+    const stored = draft || deployed;
+    return stored ? { slot, enabled: stored.enabled !== false, entryFile: stored.entryFile || "" } : { slot, enabled: slot === 1 && Boolean(vm.deployment?.entryFile), entryFile: slot === 1 ? vm.deployment?.entryFile || "" : "" };
   });
-  const [websites, setWebsites] = useState(makeSlots), [busy, setBusy] = useState(false), [error, setError] = useState(""), [saved, setSaved] = useState(false);
-  useEffect(() => { setWebsites(makeSlots()); setSaved(false); setError(""); }, [vm.id, vm.websitesUpdatedAt]);
+  const [websites, setWebsites] = useState(makeSlots), [busy, setBusy] = useState(""), [error, setError] = useState(""), [notice, setNotice] = useState("");
+  useEffect(() => { setWebsites(makeSlots()); setNotice(""); setError(""); }, [vm.id]);
   const hostname = vm.customDomains?.find(item => item.status === "active")?.domain || vm.domain;
   const update = (slot, patch) => setWebsites(current => current.map(item => item.slot === slot ? { ...item, ...patch } : item));
-  const save = async event => {
-    event.preventDefault(); setBusy(true); setError(""); setSaved(false);
+  const submit = async (event, deploy = false) => {
+    event?.preventDefault(); setBusy(deploy ? "deploy" : "save"); setError(""); setNotice("");
     try {
-      await api(`/v1/vms/${vm.name}/websites`, { method: "PUT", body: JSON.stringify({ websites }) });
-      setSaved(true); await refresh();
+      const result = await api(`/v1/vms/${vm.name}/websites`, { method: "PUT", body: JSON.stringify({ websites, deploy }) });
+      setNotice(result.warning || (deploy ? "All enabled websites were deployed." : "Website settings saved. Click Deploy websites when you are ready."));
+      await refresh();
     } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
+    finally { setBusy(""); }
   };
-  return <form className="node-websites" onSubmit={save}>
-    <header><div><small>NODE.JS MULTI-SITE</small><h2>Five websites, one node</h2><p>Each website runs as its own Node.js process and is available under a fixed path from /1 to /5.</p></div><button type="submit" disabled={busy || vm.status !== "running"}><Save /> {busy ? "Applying routes…" : "Save websites"}</button></header>
+  return <form className="node-websites" onSubmit={event => submit(event, false)}>
+    <header><div><small>NODE.JS MULTI-SITE</small><h2>Five websites, one node</h2><p>Save your slot configuration first, then deploy it when the new website files are ready.</p></div><div className="website-actions"><button type="submit" disabled={Boolean(busy)}><Save /> {busy === "save" ? "Saving…" : "Save websites"}</button><button type="button" className="deploy-websites" disabled={Boolean(busy) || vm.status !== "running"} onClick={event => submit(event, true)}><Play /> {busy === "deploy" ? "Deploying…" : "Deploy websites"}</button></div></header>
     <div className="node-website-list">{websites.map(site => {
       const active = vm.websites?.some(item => Number(item.slot) === site.slot);
       const slotDomain = vm.customDomains?.find(item => Number(item.websiteSlot) === site.slot && item.status === "active")?.domain;
@@ -1722,13 +1725,13 @@ function NodeWebsites({ vm, refresh }) {
       return <article className={site.enabled ? "enabled" : ""} key={site.slot}>
         <span className="website-slot">/{site.slot}</span>
         <div><strong>Website {site.slot}</strong><small>{slotDomain ? slotDomain : active ? "Running on its own managed port" : "Not active yet"}</small></div>
-        <label><span>Start file</span><input value={site.entryFile} onChange={event => update(site.slot, { entryFile: event.target.value })} disabled={!site.enabled || busy} placeholder={`sites/${site.slot}/server.js`} /></label>
+        <label><span>Start file</span><input value={site.entryFile} onChange={event => update(site.slot, { entryFile: event.target.value })} disabled={!site.enabled || Boolean(busy)} placeholder={`sites/${site.slot}/server.js`} /></label>
         {active ? <a href={address} target="_blank" rel="noreferrer"><Globe2 /> Open /{site.slot}</a> : <span className="website-pending">/{site.slot}</span>}
-        <label className="website-switch"><input type="checkbox" checked={site.enabled} disabled={busy} onChange={event => update(site.slot, { enabled: event.target.checked })} /><i /><span>{site.enabled ? "Enabled" : "Disabled"}</span></label>
+        <label className="website-switch"><input type="checkbox" checked={site.enabled} disabled={Boolean(busy)} onChange={event => update(site.slot, { enabled: event.target.checked })} /><i /><span>{site.enabled ? "Enabled" : "Disabled"}</span></label>
       </article>;
     })}</div>
     <footer><span><FileCode2 /><b>How it works</b> Upload every project into a separate folder in Files, then enter its start file here—for example <code>sites/2/server.js</code>.</span><span><Network /><b>Routes</b> Vyron configures Nginx, ports, process restarts and paths automatically.</span></footer>
-    {saved && <div className="vh-success"><Check /> All website routes were applied.</div>}
+    {notice && <div className="vh-success"><Check /> {notice}</div>}
     {error && <div className="vh-error">{error}</div>}
   </form>;
 }

@@ -493,8 +493,8 @@ lines = [
     'server {',
     '  listen 80 default_server;',
     '  server_name _;',
-    // Keep /1 -> /1/ redirects relative. The guest receives HTTP from the
-    // platform router even though the visitor connected through HTTPS.
+    # Keep /1 -> /1/ redirects relative. The guest receives HTTP from the
+    # platform router even though the visitor connected through HTTPS.
     '  absolute_redirect off;',
     '  location / {',
     '    proxy_pass http://127.0.0.1:' + str(main_port) + ';',

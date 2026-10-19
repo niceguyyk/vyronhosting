@@ -3167,7 +3167,10 @@
 .node-websites > header small { color: #9c7bf2; font-size: 8px; font-weight: 700; letter-spacing: 1.4px; }
 .node-websites > header h2 { margin: 7px 0 4px; font-size: 19px; }
 .node-websites > header p { margin: 0; color: #858890; font-size: 9px; }
+.website-actions { display: flex; align-items: center; gap: 8px; }
 .node-websites > header button { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border: 0; border-radius: 7px; color: white; background: #7959e8; font-size: 9px; font-weight: 650; }
+.node-websites > header button:not(.deploy-websites) { color: #cbc9d0; background: #292a2e; }
+.node-websites > header button.deploy-websites { background: linear-gradient(135deg, #7959e8, #6646d2); box-shadow: 0 8px 24px #6f50db2b; }
 .node-websites > header button svg { width: 13px; }
 .node-websites > header button:disabled { opacity: .45; }
 .node-website-list { display: grid; gap: 1px; background: #292a2e; }

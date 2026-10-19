@@ -2436,12 +2436,19 @@ app.put('/v1/vms/:name/runtime-settings', requireAuth, async (req, res) => {
 app.put('/v1/vms/:name/websites', requireAuth, async (req, res) => {
   const vm = ownedVm(req, res); if (!vm) return
   if (vm.template !== 'node') return res.status(400).json({ error: 'Multiple websites are available for Node.js nodes.' })
-  if (vm.status !== 'running') return res.status(409).json({ error: 'Start the node before changing website routes.' })
+  const deploy = req.body.deploy !== false
   const requested = Array.isArray(req.body.websites) ? req.body.websites : []
   if (requested.length > 5) return res.status(400).json({ error: 'A Node.js node supports up to five websites.' })
   const websites = requested.map(item => ({ slot: Number(item.slot), enabled: item.enabled === true, entryFile: clean(item.entryFile).replaceAll('\\', '/').replace(/^\/+/, '') }))
   if (websites.some(item => !Number.isInteger(item.slot) || item.slot < 1 || item.slot > 5 || (item.enabled && (!/^[A-Za-z0-9._/-]{1,240}$/.test(item.entryFile) || item.entryFile.split('/').some(part => !part || part === '..') || !/\.(?:js|mjs|cjs)$/i.test(item.entryFile))))) return res.status(400).json({ error: 'Each enabled website needs a valid .js, .mjs or .cjs start file.' })
   if (new Set(websites.map(item => item.slot)).size !== websites.length) return res.status(400).json({ error: 'Website slots must be unique.' })
+  if (deploy && vm.status !== 'running') return res.status(409).json({ error: 'Start the node before deploying websites.' })
+  vm.websiteDrafts = websites
+  vm.websitesUpdatedAt = new Date().toISOString()
+  if (!deploy) {
+    save(); recordAudit(req, 'node.websites.save', vm.name, { websites: websites.map(item => ({ slot: item.slot, enabled: item.enabled, entryFile: item.entryFile })) })
+    return res.json({ status: 'saved', websiteDrafts: vm.websiteDrafts, websites: vm.websites || [] })
+  }
   try {
     const result = await agentRequest(`/v1/vms/${encodeURIComponent(vm.name)}/websites`, { method: 'PUT', body: JSON.stringify({ websites }) })
     vm.websites = result.websites || []
@@ -2457,9 +2464,9 @@ app.put('/v1/vms/:name/websites', requireAuth, async (req, res) => {
         vm.route = { ...(vm.route || {}), type: 'web', hostname: vm.domain, status: 'pending', dnsError: error.message }
       }
     }
-    save(); recordAudit(req, 'node.websites.update', vm.name, { websites: vm.websites.map(item => ({ slot: item.slot, path: item.path, entryFile: item.entryFile })) })
-    createNodeEvent(vm, 'websites_updated', 'Website routes updated', `${vm.websites.length} of 5 website slots active`)
-    res.json({ websites: vm.websites, baseUrl: `https://${vm.customDomains?.find(item => item.status === 'active')?.domain || vm.domain}`, ...(dnsWarning ? { warning: `Website saved, but DNS provisioning will retry automatically: ${dnsWarning}` } : {}) })
+    save(); recordAudit(req, 'node.websites.deploy', vm.name, { websites: vm.websites.map(item => ({ slot: item.slot, path: item.path, entryFile: item.entryFile })) })
+    createNodeEvent(vm, 'websites_deployed', 'Websites deployed', `${vm.websites.length} of 5 website slots active`)
+    res.json({ status: 'deployed', websites: vm.websites, websiteDrafts: vm.websiteDrafts, baseUrl: `https://${vm.customDomains?.find(item => item.status === 'active')?.domain || vm.domain}`, ...(dnsWarning ? { warning: `Websites deployed, but DNS provisioning will retry automatically: ${dnsWarning}` } : {}) })
   } catch (error) { res.status(error.status || 502).json({ error: error.message }) }
 })
 app.post('/v1/vms/:name/upgrade', requireAuth, async (req, res) => {

@@ -434,7 +434,7 @@ app.put('/v1/vms/:name/websites', async (req, res) => {
   const normalized = Array.from({ length: 5 }, (_, index) => websites.find(item => item.slot === index + 1) || { slot: index + 1, enabled: false, entryFile: null })
   const encodedConfig = Buffer.from(JSON.stringify(normalized)).toString('base64')
   const command = "python3 - <<'PY'\nconfig_b64 = '" + encodedConfig + "'\n" + String.raw`
-import base64, json, pathlib, subprocess, time
+import base64, json, pathlib, re, subprocess, time
 
 root = pathlib.Path('/srv/vyron/app').resolve()
 sites = json.loads(base64.b64decode(config_b64))
@@ -503,6 +503,30 @@ for site in active:
         logs = subprocess.run(['journalctl', '-u', service, '-n', '30', '--no-pager', '-o', 'cat'], text=True, capture_output=True)
         detail = (logs.stdout or logs.stderr or state.stdout or 'service did not become active').strip()
         raise RuntimeError('Website /' + str(site['slot']) + ' could not start:\n' + detail[-5000:])
+    actual_port = None
+    for _ in range(40):
+        pid_result = subprocess.run(['systemctl', 'show', service, '--property', 'MainPID', '--value'], text=True, capture_output=True)
+        pid = pid_result.stdout.strip()
+        sockets = subprocess.run(['ss', '-H', '-ltnp'], text=True, capture_output=True)
+        ports = []
+        if pid and pid != '0':
+            for line in sockets.stdout.splitlines():
+                if re.search(r'\bpid=' + re.escape(pid) + r'\b', line):
+                    match = re.search(r':(\d+)\s+', line)
+                    if match:
+                        ports.append(int(match.group(1)))
+        if site['port'] in ports:
+            actual_port = site['port']
+            break
+        if ports:
+            actual_port = ports[0]
+            break
+        time.sleep(0.25)
+    if actual_port is None:
+        logs = subprocess.run(['journalctl', '-u', service, '-n', '30', '--no-pager', '-o', 'cat'], text=True, capture_output=True)
+        detail = (logs.stdout or logs.stderr or 'the process opened no HTTP port').strip()
+        raise RuntimeError('Website /' + str(site['slot']) + ' is running but opened no network port:\n' + detail[-5000:])
+    site['port'] = actual_port
 
 main_port = 3000
 try:

@@ -434,7 +434,7 @@ app.put('/v1/vms/:name/websites', async (req, res) => {
   const normalized = Array.from({ length: 5 }, (_, index) => websites.find(item => item.slot === index + 1) || { slot: index + 1, enabled: false, entryFile: null })
   const encodedConfig = Buffer.from(JSON.stringify(normalized)).toString('base64')
   const command = "python3 - <<'PY'\nconfig_b64 = '" + encodedConfig + "'\n" + String.raw`
-import base64, json, pathlib, subprocess
+import base64, json, pathlib, subprocess, time
 
 root = pathlib.Path('/srv/vyron/app').resolve()
 sites = json.loads(base64.b64decode(config_b64))
@@ -455,7 +455,10 @@ for site in sites:
         raise RuntimeError('Website /' + str(slot) + ': start file ' + str(site['entryFile']) + ' does not exist')
     workdir = entry.parent
     package = workdir / 'package.json'
-    if package.is_file() and not (workdir / 'node_modules').is_dir():
+    # node_modules can exist after an incomplete upload or an older deploy while
+    # still missing packages from the current lockfile. Reconcile dependencies
+    # on every explicit deployment instead of trusting that the folder is whole.
+    if package.is_file():
         install = ['sudo', '-u', 'vyron', 'npm', 'ci', '--include=dev'] if (workdir / 'package-lock.json').is_file() else ['sudo', '-u', 'vyron', 'npm', 'install', '--include=dev']
         run(install, cwd=str(workdir), timeout=600)
     port = 3100 + slot
@@ -481,8 +484,25 @@ WantedBy=multi-user.target
 
 run(['systemctl', 'daemon-reload'])
 for site in active:
-    run(['systemctl', 'enable', '--now', 'vyron-node-site-' + str(site['slot']) + '.service'])
-    run(['systemctl', 'restart', 'vyron-node-site-' + str(site['slot']) + '.service'])
+    service = 'vyron-node-site-' + str(site['slot']) + '.service'
+    run(['systemctl', 'enable', service])
+    run(['systemctl', 'restart', service])
+
+for site in active:
+    service = 'vyron-node-site-' + str(site['slot']) + '.service'
+    for _ in range(20):
+        state = subprocess.run(['systemctl', 'is-active', service], text=True, capture_output=True)
+        if state.stdout.strip() == 'active':
+            break
+        if state.stdout.strip() == 'failed':
+            break
+        time.sleep(0.25)
+    else:
+        state = subprocess.run(['systemctl', 'is-active', service], text=True, capture_output=True)
+    if state.stdout.strip() != 'active':
+        logs = subprocess.run(['journalctl', '-u', service, '-n', '30', '--no-pager', '-o', 'cat'], text=True, capture_output=True)
+        detail = (logs.stdout or logs.stderr or state.stdout or 'service did not become active').strip()
+        raise RuntimeError('Website /' + str(site['slot']) + ' could not start:\n' + detail[-5000:])
 
 main_port = 3000
 try:
@@ -528,8 +548,6 @@ enabled.symlink_to('/etc/nginx/sites-available/vyron-node')
 run(['nginx', '-t'])
 run(['systemctl', 'enable', '--now', 'nginx'])
 run(['systemctl', 'reload', 'nginx'])
-for site in active:
-    run(['systemctl', 'is-active', '--quiet', 'vyron-node-site-' + str(site['slot']) + '.service'])
 print(json.dumps({'websites': active, 'status': 'applied'}))
 PY`
   try {

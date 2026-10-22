@@ -1,7 +1,5 @@
-# Vyron UI conventions
+# Vyron project UI convention
 
-- Build all new or changed interface work in the existing shadcn/ui Nova design system. Reuse installed shadcn components before creating custom controls, use semantic tokens, and keep desktop and mobile behavior consistent.
-- Use GSAP for JavaScript-driven website animation. In React, use `@gsap/react` with a scoped ref and automatic cleanup. Prefer coordinated timelines, staggered reveals, and purposeful micro-interactions throughout the interface.
-- Respect `prefers-reduced-motion`: essential content must remain immediately visible and usable, while decorative loops, parallax, and large spatial movement are disabled.
-- Animate compositor-friendly `transform` and opacity properties, avoid layout-thrashing animation, and verify animations in a real browser at desktop and mobile sizes.
-
+- Preserve the established custom Vyron visual style in this repository. Do not migrate existing screens to shadcn/ui or replace the design system unless the user explicitly asks for another redesign.
+- New interface work should match the existing Vyron components, spacing, colors, typography, and interaction patterns.
+- GSAP may be used for purposeful JavaScript animation when requested, but visual changes must remain consistent with the custom Vyron style and respect `prefers-reduced-motion`.

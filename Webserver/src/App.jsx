@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
 import { loadStripe } from "@stripe/stripe-js";
 import { CheckoutElementsProvider, ExpressCheckoutElement, PaymentElement, useCheckoutElements } from "@stripe/react-stripe-js/checkout";
 import LandingPage from "./Landing.jsx";
@@ -17,73 +15,6 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-  FieldSeparator,
-  FieldSet,
-} from "@/components/ui/field";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
-import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
-import { Spinner } from "@/components/ui/spinner";
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuAction,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarRail,
-  SidebarSeparator,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-
-gsap.registerPlugin(useGSAP);
 import "./minecraft.css";
 import "./minecraft-extensions.css";
 import "./marketplace-filters.css";
@@ -436,10 +367,8 @@ function CopyButton({ value, label = "Copy" }) {
   };
   useEffect(() => () => clearTimeout(timer.current), []);
   return (
-    <Button
+    <button
       type="button"
-      variant="ghost"
-      size="icon-sm"
       className={`copy-action ${copied ? "copied" : ""} ${failed ? "failed" : ""}`}
       onClick={copy}
       disabled={!value}
@@ -448,7 +377,7 @@ function CopyButton({ value, label = "Copy" }) {
     >
       {copied ? <Check /> : <Copy />}
       {(copied || failed) && <span>{failed ? "Copy failed" : "Copied"}</span>}
-    </Button>
+    </button>
   );
 }
 
@@ -708,33 +637,15 @@ function StorageUpgrade({ vm, close, refresh }) {
 
 function Auth({ mode, onAuth }) {
   const register = mode === "register";
-  const authRef = useRef(null);
   const [form, setForm] = useState({ name: "", email: "", password: "", twoFactorCode: "", referralCode: register ? new URLSearchParams(location.search).get("ref") || "" : "", acceptTerms: false, acceptPrivacy: false }),
     [error, setError] = useState(""),
     [pendingMessage, setPendingMessage] = useState(""),
     [twoFactorRequired, setTwoFactorRequired] = useState(false),
     [busy, setBusy] = useState(false),
     [passkeyBusy, setPasskeyBusy] = useState(false);
-  useGSAP(() => {
-    const media = gsap.matchMedia();
-    media.add("(prefers-reduced-motion: no-preference)", () => {
-      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
-      timeline
-        .from(".vh-back", { autoAlpha: 0, x: -14, duration: 0.45 })
-        .from("[data-slot='card']", { autoAlpha: 0, y: 28, scale: 0.985, duration: 0.7 }, "-=0.25")
-        .from("[data-slot='card-header'] > *", { autoAlpha: 0, y: 12, duration: 0.4, stagger: 0.06 }, "-=0.4")
-        .from("[data-slot='field']", { autoAlpha: 0, y: 10, duration: 0.36, stagger: 0.045 }, "-=0.28")
-        .from("[data-slot='card-footer']", { autoAlpha: 0, y: 8, duration: 0.35 }, "-=0.2");
-    });
-    return () => media.revert();
-  }, { scope: authRef, dependencies: [mode], revertOnUpdate: true });
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-    if (register && (!form.acceptTerms || !form.acceptPrivacy)) {
-      setError("Accept the Terms and Conditions and Privacy Policy to continue.");
-      return;
-    }
     setBusy(true);
     try {
       const body = await api(`/v1/auth/${register ? "register" : "login"}`, {
@@ -771,120 +682,67 @@ function Auth({ mode, onAuth }) {
     } finally { setPasskeyBusy(false); }
   };
   return (
-    <div className="vh-auth" ref={authRef}>
+    <div className="vh-auth">
       <a className="vh-back" href="/">
         ← Back to website
       </a>
-      <form className="shadcn-auth-form" onSubmit={submit}>
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <Brand />
-            <Badge variant="outline">{register ? "CREATE ACCOUNT" : "WELCOME BACK"}</Badge>
-            <CardTitle>{register ? "Start with Vyron" : "Sign in to Vyron"}</CardTitle>
-            <CardDescription>
-              {register
-                ? "Create your account. Access starts after administrator approval."
-                : "Manage nodes, orders and billing."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <FieldGroup>
-              {pendingMessage && (
-                <Alert>
-                  <ShieldCheck />
-                  <AlertTitle>Approval pending</AlertTitle>
-                  <AlertDescription>{pendingMessage}</AlertDescription>
-                </Alert>
-              )}
-              {register && (
-                <Field>
-                  <FieldLabel htmlFor="auth-name">Name</FieldLabel>
-                  <Input
-                    id="auth-name"
-                    required
-                    minLength="2"
-                    value={form.name}
-                    onChange={(event) => setForm({ ...form, name: event.target.value })}
-                    autoComplete="name"
-                  />
-                </Field>
-              )}
-              <Field>
-                <FieldLabel htmlFor="auth-email">Email</FieldLabel>
-                <Input
-                  id="auth-email"
-                  required
-                  type="email"
-                  value={form.email}
-                  onChange={(event) => setForm({ ...form, email: event.target.value })}
-                  autoComplete={register ? "email" : "username webauthn"}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="auth-password">Password</FieldLabel>
-                <Input
-                  id="auth-password"
-                  required
-                  type="password"
-                  minLength="8"
-                  value={form.password}
-                  onChange={(event) => setForm({ ...form, password: event.target.value })}
-                  autoComplete={register ? "new-password" : "current-password"}
-                />
-              </Field>
-              {!register && twoFactorRequired && (
-                <Field>
-                  <FieldLabel htmlFor="auth-two-factor">Authentication code</FieldLabel>
-                  <Input id="auth-two-factor" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9A-Za-z -]{6,20}" value={form.twoFactorCode} onChange={(event) => setForm({ ...form, twoFactorCode: event.target.value })} placeholder="6-digit code or recovery code" autoFocus />
-                </Field>
-              )}
-              {register && form.referralCode && (
-                <Alert>
-                  <Users />
-                  <AlertTitle>Referral applied</AlertTitle>
-                  <AlertDescription>Code {form.referralCode} is active.</AlertDescription>
-                </Alert>
-              )}
-              {register && (
-                <FieldSet>
-                  <Field orientation="horizontal">
-                    <Checkbox id="accept-terms" required checked={form.acceptTerms} onCheckedChange={(checked) => setForm({ ...form, acceptTerms: Boolean(checked) })} />
-                    <FieldLabel htmlFor="accept-terms">I accept the <a href="/terms" target="_blank">Terms and Conditions</a>.</FieldLabel>
-                  </Field>
-                  <Field orientation="horizontal">
-                    <Checkbox id="accept-privacy" required checked={form.acceptPrivacy} onCheckedChange={(checked) => setForm({ ...form, acceptPrivacy: Boolean(checked) })} />
-                    <FieldLabel htmlFor="accept-privacy">I acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</FieldLabel>
-                  </Field>
-                </FieldSet>
-              )}
-              {error && (
-                <Alert variant="destructive">
-                  <AlertTitle>Sign-in failed</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              <Button className="w-full" disabled={busy || Boolean(pendingMessage)}>
-                {busy && <Spinner data-icon="inline-start" />}
-                {busy ? "Please wait…" : pendingMessage ? "Awaiting approval" : register ? "Create free account" : "Sign in"}
-              </Button>
-              {!register && (
-                <>
-                  <FieldSeparator>or</FieldSeparator>
-                  <Button className="w-full" variant="outline" type="button" disabled={busy || passkeyBusy} onClick={signInWithPasskey}>
-                    {passkeyBusy ? <Spinner data-icon="inline-start" /> : <KeyRound data-icon="inline-start" />}
-                    {passkeyBusy ? "Waiting for passkey…" : "Sign in with passkey"}
-                  </Button>
-                </>
-              )}
-            </FieldGroup>
-          </CardContent>
-          <CardFooter className="justify-center text-muted-foreground">
-            {register ? "Already registered?" : "No account yet?"}{" "}
-            <a className="ml-1 text-primary" href={register ? "/login" : "/register"}>
-              {register ? "Sign in" : "Create account"}
-            </a>
-          </CardFooter>
-        </Card>
+      <form onSubmit={submit}>
+        <Brand />
+        <small>{register ? "CREATE ACCOUNT" : "WELCOME BACK"}</small>
+        <h1>{register ? "Start with Vyron" : "Sign in to Vyron"}</h1>
+        <p>
+          {register
+            ? "Create your account. Access starts after administrator approval."
+            : "Manage nodes, orders and billing."}
+        </p>
+        {pendingMessage && <div className="settings-success"><ShieldCheck /> {pendingMessage}</div>}
+        {register && (
+          <label>
+            Name
+            <input
+              required
+              minLength="2"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              autoComplete="name"
+            />
+          </label>
+        )}
+        <label>
+          Email
+          <input
+            required
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
+            autoComplete={register ? "email" : "username webauthn"}
+          />
+        </label>
+        <label>
+          Password
+          <input
+            required
+            type="password"
+            minLength="8"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            autoComplete={register ? "new-password" : "current-password"}
+          />
+        </label>
+        {!register && twoFactorRequired && <label>Authentication code<input required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9A-Za-z -]{6,20}" value={form.twoFactorCode} onChange={(e) => setForm({ ...form, twoFactorCode: e.target.value })} placeholder="6-digit code or recovery code" autoFocus /></label>}
+        {register && form.referralCode && <div className="settings-success"><Users /> Referral code {form.referralCode} applied</div>}
+        {register && <div className="legal-consent"><label><input required type="checkbox" checked={form.acceptTerms} onChange={(e) => setForm({ ...form, acceptTerms: e.target.checked })} /><span>I accept the <a href="/terms" target="_blank">Terms and Conditions</a>.</span></label><label><input required type="checkbox" checked={form.acceptPrivacy} onChange={(e) => setForm({ ...form, acceptPrivacy: e.target.checked })} /><span>I acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label></div>}
+        {error && <div className="vh-error">{error}</div>}
+        <button disabled={busy || Boolean(pendingMessage)}>
+          {busy ? "Please wait…" : pendingMessage ? "Awaiting approval" : register ? "Create free account" : "Sign in"}
+        </button>
+        {!register && <><div className="auth-divider"><span>or</span></div><button className="passkey-login" type="button" disabled={busy || passkeyBusy} onClick={signInWithPasskey}><KeyRound /> {passkeyBusy ? "Waiting for passkey…" : "Sign in with passkey"}</button></>}
+        <footer>
+          {register ? "Already registered?" : "No account yet?"}{" "}
+          <a href={register ? "/login" : "/register"}>
+            {register ? "Sign in" : "Create account"}
+          </a>
+        </footer>
       </form>
     </div>
   );
@@ -1373,7 +1231,6 @@ function Deploy({ close, onCreated, account }) {
 }
 
 function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
-  const overviewRef = useRef(null);
   const active = account.vms.filter(
     (v) => !["deleted", "failed"].includes(v.status),
   );
@@ -1435,20 +1292,8 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
       })),
   ].slice(0, 3);
   const activities = account.events?.length ? account.events.slice(0, 3).map((event) => ({ title: event.title, copy: event.nodeName ? `${event.nodeName} · ${event.detail}` : event.detail, kind: event.severity, createdAt: event.createdAt })) : fallbackActivities;
-  useGSAP(() => {
-    const media = gsap.matchMedia();
-    media.add("(prefers-reduced-motion: no-preference)", () => {
-      const timeline = gsap.timeline({ defaults: { duration: 0.58, ease: "power3.out" } });
-      timeline
-        .from(".ent-welcome > *", { autoAlpha: 0, y: 18, stagger: 0.08 })
-        .from(".ent-stat-card", { autoAlpha: 0, y: 24, scale: 0.985, stagger: 0.07 }, "-=0.3")
-        .from(".ent-grid > *", { autoAlpha: 0, y: 24, stagger: 0.1 }, "-=0.28")
-        .from(".ent-instances article, .ent-activity article", { autoAlpha: 0, x: -12, duration: 0.38, stagger: 0.045 }, "-=0.3");
-    });
-    return () => media.revert();
-  }, { scope: overviewRef });
   return (
-    <div className="ent-overview" ref={overviewRef}>
+    <div className="ent-overview">
       <div className="ent-welcome">
         <div>
           <small>
@@ -1463,45 +1308,42 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
           <h1>Good evening, {account.user.name.split(" ")[0]}.</h1>
           <p>Everything is running smoothly across your infrastructure.</p>
         </div>
-        {canCreate && <Button className="ent-primary-action" onClick={openDeploy}>
-          <Plus data-icon="inline-start" /> New node
-        </Button>}
+        {canCreate && <button onClick={openDeploy}>
+          <Plus /> New node
+        </button>}
       </div>
       <div className="ent-stats">
         {cards.map((c) => {
           const Icon = c.icon;
           return (
-            <Card key={c.label} className={`ent-stat-card ${c.color}`}>
-              <CardHeader className="grid-cols-[auto_1fr] items-center">
+            <article key={c.label} className={c.color}>
+              <header>
                 <span>
                   <Icon />
                 </span>
-                <div>
-                  <CardTitle>{c.label}</CardTitle>
-                  <CardDescription>{c.note}</CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="relative flex min-h-16 items-end">
-                <strong>{c.value}</strong>
-                <svg viewBox="0 0 122 40" preserveAspectRatio="none">
-                  <polyline points={c.points} />
-                  <path d={`M${c.points.replaceAll(" ", " L")} L122,40 L0,40Z`} />
-                </svg>
-              </CardContent>
-            </Card>
+                <small>{c.label}</small>
+                <em>{c.note}</em>
+              </header>
+              <strong>{c.value}</strong>
+              <svg viewBox="0 0 122 40" preserveAspectRatio="none">
+                <polyline points={c.points} />
+                <path d={`M${c.points.replaceAll(" ", " L")} L122,40 L0,40Z`} />
+              </svg>
+            </article>
           );
         })}
       </div>
       <div className="ent-grid">
-        <Card className="ent-panel ent-instances">
-          <CardHeader>
-            <CardTitle>Nodes</CardTitle>
-            <CardDescription>Your active compute resources</CardDescription>
-            <CardAction><Button variant="ghost" size="sm" onClick={() => setPage("nodes")}>
+        <section className="ent-panel ent-instances">
+          <header>
+            <div>
+              <h2>Nodes</h2>
+              <p>Your active compute resources</p>
+            </div>
+            <button onClick={() => setPage("nodes")}>
               View all <ChevronRight />
-            </Button></CardAction>
-          </CardHeader>
-          <CardContent className="p-0">
+            </button>
+          </header>
           {active.length ? (
             <div>
               {active.slice(0, 4).map((v, i) => (
@@ -1522,7 +1364,9 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
                   <label>
                     <small>CPU</small>
                     <b>{v.metrics?.cpu?.toFixed?.(1) || "0.0"}%</b>
-                    <Progress value={v.metrics?.cpu || 0} />
+                    <i>
+                      <span style={{ width: `${v.metrics?.cpu || 0}%` }} />
+                    </i>
                   </label>
                   <label>
                     <small>RAM</small>
@@ -1531,35 +1375,42 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
                         ? `${Math.round(v.metrics.usedRamMb)} MB`
                         : `${v.ram} GB`}
                     </b>
-                    <Progress value={Math.min(100, ((v.metrics?.usedRamMb || 0) / (v.ram * 1024)) * 100)} />
+                    <i>
+                      <span
+                        style={{
+                          width: `${Math.min(100, ((v.metrics?.usedRamMb || 0) / (v.ram * 1024)) * 100)}%`,
+                        }}
+                      />
+                    </i>
                   </label>
-                  <Button variant="ghost" size="icon-sm" aria-label={`More actions for ${v.name}`}>
+                  <button>
                     <MoreHorizontal />
-                  </Button>
+                  </button>
                 </article>
               ))}
             </div>
           ) : (
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon"><Server /></EmptyMedia>
-                <EmptyTitle>No nodes yet</EmptyTitle>
-                <EmptyDescription>Use FREE26 for 20% off your first month.</EmptyDescription>
-              </EmptyHeader>
-              {canCreate && <EmptyContent><Button size="sm" onClick={openDeploy}>Create node</Button></EmptyContent>}
-            </Empty>
+            <div className="ent-empty">
+              <Server />
+              <span>
+                <b>No nodes yet</b>
+                <small>Use FREE26 for 20% off your first month.</small>
+              </span>
+              {canCreate && <button onClick={openDeploy}>Create node</button>}
+            </div>
           )}
-          </CardContent>
-        </Card>
-        <Card className="ent-panel ent-activity">
-          <CardHeader>
-            <CardTitle>Server activity</CardTitle>
-            <CardDescription>Recent server activity</CardDescription>
-            <CardAction><Badge variant="outline" className="ent-live-badge">
+        </section>
+        <section className="ent-panel ent-activity">
+          <header>
+            <div>
+              <h2>Server activity</h2>
+              <p>Recent server activity</p>
+            </div>
+            <span>
               <i /> LIVE
-            </Badge></CardAction>
-          </CardHeader>
-          <CardContent>
+            </span>
+          </header>
+          <div>
             {activities.length ? (
               activities.map((a, i) => (
                 <article key={i}>
@@ -1572,27 +1423,31 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
                 </article>
               ))
             ) : (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyMedia variant="icon"><Activity /></EmptyMedia>
-                  <EmptyTitle>No activity yet</EmptyTitle>
-                  <EmptyDescription>New server events will appear here.</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
+              <div className="ent-empty small">
+                <Activity />
+                <span>
+                  <b>No activity yet</b>
+                  <small>New server events will appear here.</small>
+                </span>
+              </div>
             )}
-          </CardContent>
-          <CardFooter><Button variant="ghost" size="sm" onClick={() => setPage("helper")}>
-            Open AI helper <ChevronRight data-icon="inline-end" />
-          </Button></CardFooter>
-        </Card>
+          </div>
+          <button onClick={() => setPage("helper")}>
+            Open AI helper <ChevronRight />
+          </button>
+        </section>
       </div>
-      <Card className="ent-panel ent-usage">
-        <CardHeader>
-          <CardTitle>Resource usage</CardTitle>
-          <CardDescription>Live server samples · hover for exact values</CardDescription>
-          <CardAction><NativeSelect aria-label="Usage history range"><NativeSelectOption>Live history</NativeSelectOption></NativeSelect></CardAction>
-        </CardHeader>
-        <CardContent><div className="ent-chart">
+      <section className="ent-panel ent-usage">
+        <header>
+          <div>
+            <h2>Resource usage</h2>
+            <p>Live server samples · hover for exact values</p>
+          </div>
+          <select>
+            <option>Live history</option>
+          </select>
+        </header>
+        <div className="ent-chart">
           <div className="y-axis">
             <span>100%</span>
             <span>75%</span>
@@ -1613,8 +1468,8 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
               <span>Now</span>
             </div>
           </div>
-        </div></CardContent>
-        <CardFooter>
+        </div>
+        <footer>
           <span>
             <i className="cpu" />
             CPU <b>{cpu.toFixed(1)}%</b>
@@ -1623,8 +1478,8 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
             <i className="ram" />
             Memory <b>{Math.round((usedRam / totalRam) * 100)}%</b>
           </span>
-        </CardFooter>
-      </Card>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -1872,7 +1727,7 @@ function NodeWebsites({ vm, refresh }) {
     finally { setBusy(""); }
   };
   return <form className="node-websites" onSubmit={event => submit(event, false)}>
-    <header><div><small>NODE.JS MULTI-SITE</small><h2>Multiple websites, one node</h2><p>Add websites as needed, save their start files, then deploy the new configuration.</p></div><div className="website-actions"><Button type="button" variant="outline" className="add-website" disabled={Boolean(busy) || websites.length >= 5} onClick={addWebsite}><Plus data-icon="inline-start" /> {websites.length >= 5 ? "Five websites added" : "Add website"}</Button><Button type="submit" variant="secondary" disabled={Boolean(busy)}><Save data-icon="inline-start" /> {busy === "save" ? "Saving…" : "Save websites"}</Button><Button type="button" className="deploy-websites" disabled={Boolean(busy) || vm.status !== "running"} onClick={event => submit(event, true)}><Play data-icon="inline-start" /> {busy === "deploy" ? "Deploying…" : "Deploy websites"}</Button></div></header>
+    <header><div><small>NODE.JS MULTI-SITE</small><h2>Multiple websites, one node</h2><p>Add websites as needed, save their start files, then deploy the new configuration.</p></div><div className="website-actions"><button type="button" className="add-website" disabled={Boolean(busy) || websites.length >= 5} onClick={addWebsite}><Plus /> {websites.length >= 5 ? "Five websites added" : "Add website"}</button><button type="submit" disabled={Boolean(busy)}><Save /> {busy === "save" ? "Saving…" : "Save websites"}</button><button type="button" className="deploy-websites" disabled={Boolean(busy) || vm.status !== "running"} onClick={event => submit(event, true)}><Play /> {busy === "deploy" ? "Deploying…" : "Deploy websites"}</button></div></header>
     {websites.length ? <div className="node-website-list">{websites.map(site => {
       const active = vm.websites?.some(item => Number(item.slot) === site.slot);
       const slotDomain = vm.customDomains?.find(item => Number(item.websiteSlot) === site.slot && item.status === "active")?.domain;
@@ -1880,12 +1735,12 @@ function NodeWebsites({ vm, refresh }) {
       return <article className={site.enabled ? "enabled" : ""} key={site.slot}>
         <span className="website-slot">/{site.slot}</span>
         <div><strong>Website {site.slot}</strong><small>{slotDomain ? slotDomain : active ? "Running on its own managed port" : "Not active yet"}</small></div>
-        <label><span>Start file</span><Input value={site.entryFile} onChange={event => update(site.slot, { entryFile: event.target.value })} disabled={!site.enabled || Boolean(busy)} placeholder={`sites/${site.slot}/server.js`} /></label>
+        <label><span>Start file</span><input value={site.entryFile} onChange={event => update(site.slot, { entryFile: event.target.value })} disabled={!site.enabled || Boolean(busy)} placeholder={`sites/${site.slot}/server.js`} /></label>
         {active ? <a href={address} target="_blank" rel="noreferrer"><Globe2 /> Open /{site.slot}</a> : <span className="website-pending">/{site.slot}</span>}
         <label className="website-switch"><input type="checkbox" checked={site.enabled} disabled={Boolean(busy)} onChange={event => update(site.slot, { enabled: event.target.checked })} /><i /><span>{site.enabled ? "Enabled" : "Disabled"}</span></label>
-        <Button type="button" variant="ghost" size="icon-sm" className="website-remove" disabled={Boolean(busy)} onClick={() => removeWebsite(site.slot)} aria-label={`Remove website ${site.slot}`}><Trash2 /></Button>
+        <button type="button" className="website-remove" disabled={Boolean(busy)} onClick={() => removeWebsite(site.slot)} aria-label={`Remove website ${site.slot}`}><Trash2 /></button>
       </article>;
-    })}</div> : <div className="node-websites-empty"><Globe2 /><strong>No websites configured</strong><span>Click Add website to create your first website slot.</span><Button type="button" variant="outline" disabled={Boolean(busy)} onClick={addWebsite}><Plus data-icon="inline-start" /> Add website</Button></div>}
+    })}</div> : <div className="node-websites-empty"><Globe2 /><strong>No websites configured</strong><span>Click Add website to create your first website slot.</span><button type="button" disabled={Boolean(busy)} onClick={addWebsite}><Plus /> Add website</button></div>}
     <footer><span><FileCode2 /><b>How it works</b> Upload every project into a separate folder in Files, then enter its start file here—for example <code>sites/2/server.js</code>.</span><span><Network /><b>Routes</b> Vyron configures Nginx, ports, process restarts and paths automatically.</span></footer>
     {notice && <div className="vh-success"><Check /> {notice}</div>}
     {error && <div className="vh-error">{error}</div>}
@@ -3924,8 +3779,6 @@ function AdminPanel() {
 }
 
 function Dashboard({ user, onLogout }) {
-  const dashboardRef = useRef(null);
-  const contentRef = useRef(null);
   const routeMatch = window.location.pathname.match(
     /^\/(?:nodes|instances)\/([^/]+)$/,
   );
@@ -3941,6 +3794,7 @@ function Dashboard({ user, onLogout }) {
     [selectedId, setSelectedId] = useState(
       routeMatch ? decodeURIComponent(routeMatch[1]) : null,
     ),
+    [mobile, setMobile] = useState(false),
     [error, setError] = useState("");
   const refresh = async () => {
     try {
@@ -3993,21 +3847,6 @@ function Dashboard({ user, onLogout }) {
       window.removeEventListener("popstate", pop);
     };
   }, []);
-  useGSAP(() => {
-    if (!loaded || !contentRef.current) return;
-    const media = gsap.matchMedia();
-    media.add("(prefers-reduced-motion: no-preference)", () => {
-      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
-      timeline
-        .from(".vh-top > *", { autoAlpha: 0, y: -10, duration: 0.42, stagger: 0.035 })
-        .from(".vh-content > *", { autoAlpha: 0, y: 18, duration: 0.52, stagger: 0.06 }, "-=0.2");
-    });
-    return () => media.revert();
-  }, {
-    scope: dashboardRef,
-    dependencies: [loaded, page, selectedId],
-    revertOnUpdate: true,
-  });
   const nav = [
     ["overview", "Overview", LayoutDashboard],
     ["nodes", "Nodes", Server],
@@ -4045,6 +3884,7 @@ function Dashboard({ user, onLogout }) {
   const goPage = (id) => {
     setSelectedId(null);
     setPage(id);
+    setMobile(false);
     history.pushState({}, "", id === "nodes" ? "/nodes" : id === "admin" ? "/admin" : "/app");
   };
   const monthly = account.orders
@@ -4058,162 +3898,101 @@ function Dashboard({ user, onLogout }) {
     return <LoadingScreen />;
   if (!account.workspace)
     return <WorkspaceSetup user={account.user} onCreated={refresh} />;
-  const usagePercent = Math.min(100, (monthly / 50) * 100);
   return (
-    <SidebarProvider
-      ref={dashboardRef}
-      className="vh-shell ent-shell"
-      style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "3.5rem" }}
-    >
-      <Sidebar collapsible="icon" variant="inset">
-        <SidebarHeader>
-          <div className="flex h-10 items-center px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-            <Brand />
+    <div className="vh-shell ent-shell">
+      <aside className={mobile ? "open" : ""}>
+        <header>
+          <Brand />
+          <button onClick={() => setMobile(false)}>
+            <X />
+          </button>
+        </header>
+        <button className="ent-workspace" onClick={() => goPage("settings")}>
+          <span>{account.workspace.name.slice(0, 2).toUpperCase()}</span>
+          <div>
+            <b>{account.workspace.name}</b>
+            <small>{account.workspace.slug} · EU Central</small>
           </div>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                size="lg"
-                tooltip="Workspace settings"
-                onClick={() => goPage("settings")}
-              >
-                <Avatar size="sm">
-                  <AvatarFallback>{account.workspace.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <span className="flex min-w-0 flex-1 flex-col text-left">
-                  <span className="truncate font-medium">{account.workspace.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">{account.workspace.slug} · EU Central</span>
-                </span>
-                <ChevronRight />
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          {account.workspaces?.length > 1 && (
-            <NativeSelect
-              className="w-full group-data-[collapsible=icon]:hidden"
-              aria-label="Active workspace"
-              value={account.workspace.id}
-              onChange={(event) => activateWorkspace(event.target.value)}
+          <ChevronRight />
+        </button>
+        {account.workspaces?.length > 1 && <select className="workspace-switcher" value={account.workspace.id} onChange={(e) => activateWorkspace(e.target.value)}>{account.workspaces.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.role}</option>)}</select>}
+        <nav>
+          <small>WORKSPACE</small>
+          {nav.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              className={page === id ? "active" : ""}
+              onClick={() => goPage(id)}
             >
-              {account.workspaces.map((item) => (
-                <NativeSelectOption key={item.id} value={item.id}>
-                  {item.name} · {item.role}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-          )}
-        </SidebarHeader>
-        <SidebarSeparator />
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {nav.map(([id, label, Icon]) => (
-                  <SidebarMenuItem key={id}>
-                    <SidebarMenuButton
-                      isActive={page === id}
-                      tooltip={label}
-                      onClick={() => goPage(id)}
-                    >
-                      <Icon />
-                      <span>{label}</span>
-                    </SidebarMenuButton>
-                    {id === "helper" && <SidebarMenuBadge>AI</SidebarMenuBadge>}
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarGroup>
-            <SidebarGroupLabel>Manage</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {manage.map(([id, label, Icon]) => (
-                  <SidebarMenuItem key={id}>
-                    <SidebarMenuButton
-                      isActive={page === id}
-                      tooltip={label}
-                      onClick={() => goPage(id)}
-                    >
-                      <Icon />
-                      <span>{label}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-        <SidebarSeparator />
-        <SidebarFooter>
-          <Progress value={usagePercent} className="group-data-[collapsible=icon]:hidden">
-            <ProgressLabel>Monthly usage</ProgressLabel>
-            <ProgressValue>{`€${monthly.toFixed(2)}`}</ProgressValue>
-          </Progress>
-          <span className="px-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-            €{monthly.toFixed(2)} of €50.00
-          </span>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Help & documentation">
-                <CircleHelp />
-                <span>Help & documentation</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton size="lg" tooltip={account.user.name}>
-                <Avatar size="sm">
-                  <AvatarFallback>{account.user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <span className="flex min-w-0 flex-1 flex-col text-left">
-                  <span className="truncate font-medium">{account.user.name}</span>
-                  <span className="truncate text-xs text-muted-foreground">{account.user.email}</span>
-                </span>
-              </SidebarMenuButton>
-              <SidebarMenuAction aria-label="Sign out" onClick={logout}>
-                <LogOut />
-              </SidebarMenuAction>
-            </SidebarMenuItem>
-          </SidebarMenu>
-          <nav className="flex items-center justify-center gap-3 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-            <a href="/terms" target="_blank">AGB</a>
-            <a href="/privacy" target="_blank">Datenschutz</a>
-            <a href="https://status.vyronpanel.com" target="_blank" rel="noreferrer">Status</a>
-          </nav>
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
-      <SidebarInset className="min-w-0">
+              <Icon />
+              {label}
+              {id === "helper" && <em>AI</em>}
+            </button>
+          ))}
+          <small>MANAGE</small>
+          {manage.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              className={page === id ? "active" : ""}
+              onClick={() => goPage(id)}
+            >
+              <Icon />
+              {label}
+            </button>
+          ))}
+        </nav>
+        <div className="ent-side-bottom">
+          <div className="ent-spend">
+            <span>
+              Monthly usage <b>€{monthly.toFixed(2)}</b>
+            </span>
+            <i>
+              <em
+                style={{ width: `${Math.min(100, (monthly / 50) * 100)}%` }}
+              />
+            </i>
+            <small>€{monthly.toFixed(2)} of €50.00</small>
+          </div>
+          <button>
+            <CircleHelp /> Help & documentation <ChevronRight />
+          </button>
+          <nav className="ent-legal"><a href="/terms" target="_blank">AGB</a><a href="/privacy" target="_blank">Datenschutz</a><a href="https://status.vyronpanel.com" target="_blank" rel="noreferrer">Status</a></nav>
+          <footer>
+            <span>{account.user.name.slice(0, 2).toUpperCase()}</span>
+            <div>
+              <b>{account.user.name}</b>
+              <small>{account.user.email}</small>
+            </div>
+            <button onClick={logout}>
+              <LogOut />
+            </button>
+          </footer>
+        </div>
+      </aside>
+      <main>
         <header className="vh-top ent-top">
-          <SidebarTrigger />
+          <button onClick={() => setMobile(true)}>
+            <Menu />
+          </button>
           <div>
             <span>Vyron Cloud</span>
             <ChevronRight />
             <b>{current}</b>
           </div>
-          <InputGroup className="ent-search hidden max-w-sm flex-1 lg:flex">
-            <InputGroupAddon><Search /></InputGroupAddon>
-            <InputGroupInput aria-label="Search workspace" placeholder="Search" />
-            <InputGroupAddon align="inline-end"><kbd>⌘ K</kbd></InputGroupAddon>
-          </InputGroup>
-          <Tooltip>
-            <TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Help" />}>
-              <CircleHelp />
-            </TooltipTrigger>
-            <TooltipContent>Help & documentation</TooltipContent>
-          </Tooltip>
-          <Badge variant="outline" className="ent-region">
+          <label>
+            <Search />
+            <input placeholder="Search" />
+            <kbd>⌘ K</kbd>
+          </label>
+          <button className="ent-help">
+            <CircleHelp />
+          </button>
+          <span className="ent-region">
             <i /> EU Central
-          </Badge>
+          </span>
         </header>
-        <div className="vh-content ent-content" ref={contentRef}>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertTitle>Request failed</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+        <div className="vh-content ent-content">
+          {error && <div className="vh-error">{error}</div>}
           {selectedVm ? (
             <VMDetail vm={selectedVm} domains={account.domains} close={closeVm} refresh={refresh} />
           ) : (
@@ -4254,7 +4033,7 @@ function Dashboard({ user, onLogout }) {
             </>
           )}
         </div>
-      </SidebarInset>
+      </main>
       {deploy && (
         <Deploy
           account={account}
@@ -4265,7 +4044,7 @@ function Dashboard({ user, onLogout }) {
           onCreated={() => refresh()}
         />
       )}
-    </SidebarProvider>
+    </div>
   );
 }
 

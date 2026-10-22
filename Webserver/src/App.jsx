@@ -17,8 +17,69 @@ import "@xterm/xterm/css/xterm.css";
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+  FieldSet,
+} from "@/components/ui/field";
+import {
+  NativeSelect,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarSeparator,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import "./minecraft.css";
 import "./minecraft-extensions.css";
 import "./marketplace-filters.css";
@@ -652,6 +713,10 @@ function Auth({ mode, onAuth }) {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    if (register && (!form.acceptTerms || !form.acceptPrivacy)) {
+      setError("Accept the Terms and Conditions and Privacy Policy to continue.");
+      return;
+    }
     setBusy(true);
     try {
       const body = await api(`/v1/auth/${register ? "register" : "login"}`, {
@@ -692,63 +757,116 @@ function Auth({ mode, onAuth }) {
       <a className="vh-back" href="/">
         ← Back to website
       </a>
-      <form onSubmit={submit}>
-        <Brand />
-        <small>{register ? "CREATE ACCOUNT" : "WELCOME BACK"}</small>
-        <h1>{register ? "Start with Vyron" : "Sign in to Vyron"}</h1>
-        <p>
-          {register
-            ? "Create your account. Access starts after administrator approval."
-            : "Manage nodes, orders and billing."}
-        </p>
-        {pendingMessage && <div className="settings-success"><ShieldCheck /> {pendingMessage}</div>}
-        {register && (
-          <label>
-            Name
-            <input
-              required
-              minLength="2"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              autoComplete="name"
-            />
-          </label>
-        )}
-        <label>
-          Email
-          <input
-            required
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-            autoComplete={register ? "email" : "username webauthn"}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            required
-            type="password"
-            minLength="8"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            autoComplete={register ? "new-password" : "current-password"}
-          />
-        </label>
-        {!register && twoFactorRequired && <label>Authentication code<input required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9A-Za-z -]{6,20}" value={form.twoFactorCode} onChange={(e) => setForm({ ...form, twoFactorCode: e.target.value })} placeholder="6-digit code or recovery code" autoFocus /></label>}
-        {register && form.referralCode && <div className="settings-success"><Users /> Referral code {form.referralCode} applied</div>}
-        {register && <div className="legal-consent"><label><input required type="checkbox" checked={form.acceptTerms} onChange={(e) => setForm({ ...form, acceptTerms: e.target.checked })} /><span>I accept the <a href="/terms" target="_blank">Terms and Conditions</a>.</span></label><label><input required type="checkbox" checked={form.acceptPrivacy} onChange={(e) => setForm({ ...form, acceptPrivacy: e.target.checked })} /><span>I acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</span></label></div>}
-        {error && <div className="vh-error">{error}</div>}
-        <button disabled={busy || Boolean(pendingMessage)}>
-          {busy ? "Please wait…" : pendingMessage ? "Awaiting approval" : register ? "Create free account" : "Sign in"}
-        </button>
-        {!register && <><div className="auth-divider"><span>or</span></div><button className="passkey-login" type="button" disabled={busy || passkeyBusy} onClick={signInWithPasskey}><KeyRound /> {passkeyBusy ? "Waiting for passkey…" : "Sign in with passkey"}</button></>}
-        <footer>
-          {register ? "Already registered?" : "No account yet?"}{" "}
-          <a href={register ? "/login" : "/register"}>
-            {register ? "Sign in" : "Create account"}
-          </a>
-        </footer>
+      <form className="shadcn-auth-form" onSubmit={submit}>
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <Brand />
+            <Badge variant="outline">{register ? "CREATE ACCOUNT" : "WELCOME BACK"}</Badge>
+            <CardTitle>{register ? "Start with Vyron" : "Sign in to Vyron"}</CardTitle>
+            <CardDescription>
+              {register
+                ? "Create your account. Access starts after administrator approval."
+                : "Manage nodes, orders and billing."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FieldGroup>
+              {pendingMessage && (
+                <Alert>
+                  <ShieldCheck />
+                  <AlertTitle>Approval pending</AlertTitle>
+                  <AlertDescription>{pendingMessage}</AlertDescription>
+                </Alert>
+              )}
+              {register && (
+                <Field>
+                  <FieldLabel htmlFor="auth-name">Name</FieldLabel>
+                  <Input
+                    id="auth-name"
+                    required
+                    minLength="2"
+                    value={form.name}
+                    onChange={(event) => setForm({ ...form, name: event.target.value })}
+                    autoComplete="name"
+                  />
+                </Field>
+              )}
+              <Field>
+                <FieldLabel htmlFor="auth-email">Email</FieldLabel>
+                <Input
+                  id="auth-email"
+                  required
+                  type="email"
+                  value={form.email}
+                  onChange={(event) => setForm({ ...form, email: event.target.value })}
+                  autoComplete={register ? "email" : "username webauthn"}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="auth-password">Password</FieldLabel>
+                <Input
+                  id="auth-password"
+                  required
+                  type="password"
+                  minLength="8"
+                  value={form.password}
+                  onChange={(event) => setForm({ ...form, password: event.target.value })}
+                  autoComplete={register ? "new-password" : "current-password"}
+                />
+              </Field>
+              {!register && twoFactorRequired && (
+                <Field>
+                  <FieldLabel htmlFor="auth-two-factor">Authentication code</FieldLabel>
+                  <Input id="auth-two-factor" required inputMode="numeric" autoComplete="one-time-code" pattern="[0-9A-Za-z -]{6,20}" value={form.twoFactorCode} onChange={(event) => setForm({ ...form, twoFactorCode: event.target.value })} placeholder="6-digit code or recovery code" autoFocus />
+                </Field>
+              )}
+              {register && form.referralCode && (
+                <Alert>
+                  <Users />
+                  <AlertTitle>Referral applied</AlertTitle>
+                  <AlertDescription>Code {form.referralCode} is active.</AlertDescription>
+                </Alert>
+              )}
+              {register && (
+                <FieldSet>
+                  <Field orientation="horizontal">
+                    <Checkbox id="accept-terms" required checked={form.acceptTerms} onCheckedChange={(checked) => setForm({ ...form, acceptTerms: Boolean(checked) })} />
+                    <FieldLabel htmlFor="accept-terms">I accept the <a href="/terms" target="_blank">Terms and Conditions</a>.</FieldLabel>
+                  </Field>
+                  <Field orientation="horizontal">
+                    <Checkbox id="accept-privacy" required checked={form.acceptPrivacy} onCheckedChange={(checked) => setForm({ ...form, acceptPrivacy: Boolean(checked) })} />
+                    <FieldLabel htmlFor="accept-privacy">I acknowledge the <a href="/privacy" target="_blank">Privacy Policy</a>.</FieldLabel>
+                  </Field>
+                </FieldSet>
+              )}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertTitle>Sign-in failed</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <Button className="w-full" disabled={busy || Boolean(pendingMessage)}>
+                {busy && <Spinner data-icon="inline-start" />}
+                {busy ? "Please wait…" : pendingMessage ? "Awaiting approval" : register ? "Create free account" : "Sign in"}
+              </Button>
+              {!register && (
+                <>
+                  <FieldSeparator>or</FieldSeparator>
+                  <Button className="w-full" variant="outline" type="button" disabled={busy || passkeyBusy} onClick={signInWithPasskey}>
+                    {passkeyBusy ? <Spinner data-icon="inline-start" /> : <KeyRound data-icon="inline-start" />}
+                    {passkeyBusy ? "Waiting for passkey…" : "Sign in with passkey"}
+                  </Button>
+                </>
+              )}
+            </FieldGroup>
+          </CardContent>
+          <CardFooter className="justify-center text-muted-foreground">
+            {register ? "Already registered?" : "No account yet?"}{" "}
+            <a className="ml-1 text-primary" href={register ? "/login" : "/register"}>
+              {register ? "Sign in" : "Create account"}
+            </a>
+          </CardFooter>
+        </Card>
       </form>
     </div>
   );
@@ -1323,33 +1441,36 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
           const Icon = c.icon;
           return (
             <Card key={c.label} className={`ent-stat-card ${c.color}`}>
-              <header>
+              <CardHeader className="grid-cols-[auto_1fr] items-center">
                 <span>
                   <Icon />
                 </span>
-                <small>{c.label}</small>
-                <em>{c.note}</em>
-              </header>
-              <strong>{c.value}</strong>
-              <svg viewBox="0 0 122 40" preserveAspectRatio="none">
-                <polyline points={c.points} />
-                <path d={`M${c.points.replaceAll(" ", " L")} L122,40 L0,40Z`} />
-              </svg>
+                <div>
+                  <CardTitle>{c.label}</CardTitle>
+                  <CardDescription>{c.note}</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent className="relative flex min-h-16 items-end">
+                <strong>{c.value}</strong>
+                <svg viewBox="0 0 122 40" preserveAspectRatio="none">
+                  <polyline points={c.points} />
+                  <path d={`M${c.points.replaceAll(" ", " L")} L122,40 L0,40Z`} />
+                </svg>
+              </CardContent>
             </Card>
           );
         })}
       </div>
       <div className="ent-grid">
         <Card className="ent-panel ent-instances">
-          <header>
-            <div>
-              <h2>Nodes</h2>
-              <p>Your active compute resources</p>
-            </div>
-            <Button variant="ghost" size="sm" onClick={() => setPage("nodes")}>
+          <CardHeader>
+            <CardTitle>Nodes</CardTitle>
+            <CardDescription>Your active compute resources</CardDescription>
+            <CardAction><Button variant="ghost" size="sm" onClick={() => setPage("nodes")}>
               View all <ChevronRight />
-            </Button>
-          </header>
+            </Button></CardAction>
+          </CardHeader>
+          <CardContent className="p-0">
           {active.length ? (
             <div>
               {active.slice(0, 4).map((v, i) => (
@@ -1370,9 +1491,7 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
                   <label>
                     <small>CPU</small>
                     <b>{v.metrics?.cpu?.toFixed?.(1) || "0.0"}%</b>
-                    <i>
-                      <span style={{ width: `${v.metrics?.cpu || 0}%` }} />
-                    </i>
+                    <Progress value={v.metrics?.cpu || 0} />
                   </label>
                   <label>
                     <small>RAM</small>
@@ -1381,42 +1500,35 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
                         ? `${Math.round(v.metrics.usedRamMb)} MB`
                         : `${v.ram} GB`}
                     </b>
-                    <i>
-                      <span
-                        style={{
-                          width: `${Math.min(100, ((v.metrics?.usedRamMb || 0) / (v.ram * 1024)) * 100)}%`,
-                        }}
-                      />
-                    </i>
+                    <Progress value={Math.min(100, ((v.metrics?.usedRamMb || 0) / (v.ram * 1024)) * 100)} />
                   </label>
-                  <button>
+                  <Button variant="ghost" size="icon-sm" aria-label={`More actions for ${v.name}`}>
                     <MoreHorizontal />
-                  </button>
+                  </Button>
                 </article>
               ))}
             </div>
           ) : (
-            <div className="ent-empty">
-              <Server />
-              <span>
-                <b>No nodes yet</b>
-                <small>Use FREE26 for 20% off your first month.</small>
-              </span>
-              {canCreate && <Button size="sm" onClick={openDeploy}>Create node</Button>}
-            </div>
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon"><Server /></EmptyMedia>
+                <EmptyTitle>No nodes yet</EmptyTitle>
+                <EmptyDescription>Use FREE26 for 20% off your first month.</EmptyDescription>
+              </EmptyHeader>
+              {canCreate && <EmptyContent><Button size="sm" onClick={openDeploy}>Create node</Button></EmptyContent>}
+            </Empty>
           )}
+          </CardContent>
         </Card>
         <Card className="ent-panel ent-activity">
-          <header>
-            <div>
-              <h2>Server activity</h2>
-              <p>Recent server activity</p>
-            </div>
-            <Badge variant="outline" className="ent-live-badge">
+          <CardHeader>
+            <CardTitle>Server activity</CardTitle>
+            <CardDescription>Recent server activity</CardDescription>
+            <CardAction><Badge variant="outline" className="ent-live-badge">
               <i /> LIVE
-            </Badge>
-          </header>
-          <div>
+            </Badge></CardAction>
+          </CardHeader>
+          <CardContent>
             {activities.length ? (
               activities.map((a, i) => (
                 <article key={i}>
@@ -1429,31 +1541,27 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
                 </article>
               ))
             ) : (
-              <div className="ent-empty small">
-                <Activity />
-                <span>
-                  <b>No activity yet</b>
-                  <small>New server events will appear here.</small>
-                </span>
-              </div>
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon"><Activity /></EmptyMedia>
+                  <EmptyTitle>No activity yet</EmptyTitle>
+                  <EmptyDescription>New server events will appear here.</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             )}
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => setPage("helper")}>
-            Open AI helper <ChevronRight />
-          </Button>
+          </CardContent>
+          <CardFooter><Button variant="ghost" size="sm" onClick={() => setPage("helper")}>
+            Open AI helper <ChevronRight data-icon="inline-end" />
+          </Button></CardFooter>
         </Card>
       </div>
       <Card className="ent-panel ent-usage">
-        <header>
-          <div>
-            <h2>Resource usage</h2>
-            <p>Live server samples · hover for exact values</p>
-          </div>
-          <select>
-            <option>Live history</option>
-          </select>
-        </header>
-        <div className="ent-chart">
+        <CardHeader>
+          <CardTitle>Resource usage</CardTitle>
+          <CardDescription>Live server samples · hover for exact values</CardDescription>
+          <CardAction><NativeSelect aria-label="Usage history range"><NativeSelectOption>Live history</NativeSelectOption></NativeSelect></CardAction>
+        </CardHeader>
+        <CardContent><div className="ent-chart">
           <div className="y-axis">
             <span>100%</span>
             <span>75%</span>
@@ -1474,8 +1582,8 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
               <span>Now</span>
             </div>
           </div>
-        </div>
-        <footer>
+        </div></CardContent>
+        <CardFooter>
           <span>
             <i className="cpu" />
             CPU <b>{cpu.toFixed(1)}%</b>
@@ -1484,7 +1592,7 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
             <i className="ram" />
             Memory <b>{Math.round((usedRam / totalRam) * 100)}%</b>
           </span>
-        </footer>
+        </CardFooter>
       </Card>
     </div>
   );
@@ -3800,7 +3908,6 @@ function Dashboard({ user, onLogout }) {
     [selectedId, setSelectedId] = useState(
       routeMatch ? decodeURIComponent(routeMatch[1]) : null,
     ),
-    [mobile, setMobile] = useState(false),
     [error, setError] = useState("");
   const refresh = async () => {
     try {
@@ -3890,7 +3997,6 @@ function Dashboard({ user, onLogout }) {
   const goPage = (id) => {
     setSelectedId(null);
     setPage(id);
-    setMobile(false);
     history.pushState({}, "", id === "nodes" ? "/nodes" : id === "admin" ? "/admin" : "/app");
   };
   const monthly = account.orders
@@ -3904,101 +4010,161 @@ function Dashboard({ user, onLogout }) {
     return <LoadingScreen />;
   if (!account.workspace)
     return <WorkspaceSetup user={account.user} onCreated={refresh} />;
+  const usagePercent = Math.min(100, (monthly / 50) * 100);
   return (
-    <div className="vh-shell ent-shell">
-      <aside className={mobile ? "open" : ""}>
-        <header>
-          <Brand />
-          <button onClick={() => setMobile(false)}>
-            <X />
-          </button>
-        </header>
-        <button className="ent-workspace" onClick={() => goPage("settings")}>
-          <span>{account.workspace.name.slice(0, 2).toUpperCase()}</span>
-          <div>
-            <b>{account.workspace.name}</b>
-            <small>{account.workspace.slug} · EU Central</small>
+    <SidebarProvider
+      className="vh-shell ent-shell"
+      style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "3.5rem" }}
+    >
+      <Sidebar collapsible="icon" variant="inset">
+        <SidebarHeader>
+          <div className="flex h-10 items-center px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+            <Brand />
           </div>
-          <ChevronRight />
-        </button>
-        {account.workspaces?.length > 1 && <select className="workspace-switcher" value={account.workspace.id} onChange={(e) => activateWorkspace(e.target.value)}>{account.workspaces.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.role}</option>)}</select>}
-        <nav>
-          <small>WORKSPACE</small>
-          {nav.map(([id, label, Icon]) => (
-            <button
-              key={id}
-              className={page === id ? "active" : ""}
-              onClick={() => goPage(id)}
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                size="lg"
+                tooltip="Workspace settings"
+                onClick={() => goPage("settings")}
+              >
+                <Avatar size="sm">
+                  <AvatarFallback>{account.workspace.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <span className="flex min-w-0 flex-1 flex-col text-left">
+                  <span className="truncate font-medium">{account.workspace.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">{account.workspace.slug} · EU Central</span>
+                </span>
+                <ChevronRight />
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          {account.workspaces?.length > 1 && (
+            <NativeSelect
+              className="w-full group-data-[collapsible=icon]:hidden"
+              aria-label="Active workspace"
+              value={account.workspace.id}
+              onChange={(event) => activateWorkspace(event.target.value)}
             >
-              <Icon />
-              {label}
-              {id === "helper" && <em>AI</em>}
-            </button>
-          ))}
-          <small>MANAGE</small>
-          {manage.map(([id, label, Icon]) => (
-            <button
-              key={id}
-              className={page === id ? "active" : ""}
-              onClick={() => goPage(id)}
-            >
-              <Icon />
-              {label}
-            </button>
-          ))}
-        </nav>
-        <div className="ent-side-bottom">
-          <div className="ent-spend">
-            <span>
-              Monthly usage <b>€{monthly.toFixed(2)}</b>
-            </span>
-            <i>
-              <em
-                style={{ width: `${Math.min(100, (monthly / 50) * 100)}%` }}
-              />
-            </i>
-            <small>€{monthly.toFixed(2)} of €50.00</small>
-          </div>
-          <button>
-            <CircleHelp /> Help & documentation <ChevronRight />
-          </button>
-          <nav className="ent-legal"><a href="/terms" target="_blank">AGB</a><a href="/privacy" target="_blank">Datenschutz</a><a href="https://status.vyronpanel.com" target="_blank" rel="noreferrer">Status</a></nav>
-          <footer>
-            <span>{account.user.name.slice(0, 2).toUpperCase()}</span>
-            <div>
-              <b>{account.user.name}</b>
-              <small>{account.user.email}</small>
-            </div>
-            <button onClick={logout}>
-              <LogOut />
-            </button>
-          </footer>
-        </div>
-      </aside>
-      <main>
+              {account.workspaces.map((item) => (
+                <NativeSelectOption key={item.id} value={item.id}>
+                  {item.name} · {item.role}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          )}
+        </SidebarHeader>
+        <SidebarSeparator />
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {nav.map(([id, label, Icon]) => (
+                  <SidebarMenuItem key={id}>
+                    <SidebarMenuButton
+                      isActive={page === id}
+                      tooltip={label}
+                      onClick={() => goPage(id)}
+                    >
+                      <Icon />
+                      <span>{label}</span>
+                    </SidebarMenuButton>
+                    {id === "helper" && <SidebarMenuBadge>AI</SidebarMenuBadge>}
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupLabel>Manage</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {manage.map(([id, label, Icon]) => (
+                  <SidebarMenuItem key={id}>
+                    <SidebarMenuButton
+                      isActive={page === id}
+                      tooltip={label}
+                      onClick={() => goPage(id)}
+                    >
+                      <Icon />
+                      <span>{label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+        <SidebarSeparator />
+        <SidebarFooter>
+          <Progress value={usagePercent} className="group-data-[collapsible=icon]:hidden">
+            <ProgressLabel>Monthly usage</ProgressLabel>
+            <ProgressValue>{`€${monthly.toFixed(2)}`}</ProgressValue>
+          </Progress>
+          <span className="px-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+            €{monthly.toFixed(2)} of €50.00
+          </span>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="Help & documentation">
+                <CircleHelp />
+                <span>Help & documentation</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" tooltip={account.user.name}>
+                <Avatar size="sm">
+                  <AvatarFallback>{account.user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <span className="flex min-w-0 flex-1 flex-col text-left">
+                  <span className="truncate font-medium">{account.user.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">{account.user.email}</span>
+                </span>
+              </SidebarMenuButton>
+              <SidebarMenuAction aria-label="Sign out" onClick={logout}>
+                <LogOut />
+              </SidebarMenuAction>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <nav className="flex items-center justify-center gap-3 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+            <a href="/terms" target="_blank">AGB</a>
+            <a href="/privacy" target="_blank">Datenschutz</a>
+            <a href="https://status.vyronpanel.com" target="_blank" rel="noreferrer">Status</a>
+          </nav>
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+      <SidebarInset className="min-w-0">
         <header className="vh-top ent-top">
-          <button onClick={() => setMobile(true)}>
-            <Menu />
-          </button>
+          <SidebarTrigger />
           <div>
             <span>Vyron Cloud</span>
             <ChevronRight />
             <b>{current}</b>
           </div>
-          <label>
-            <Search />
-            <input placeholder="Search" />
-            <kbd>⌘ K</kbd>
-          </label>
-          <button className="ent-help">
-            <CircleHelp />
-          </button>
-          <span className="ent-region">
+          <InputGroup className="ent-search hidden max-w-sm flex-1 lg:flex">
+            <InputGroupAddon><Search /></InputGroupAddon>
+            <InputGroupInput aria-label="Search workspace" placeholder="Search" />
+            <InputGroupAddon align="inline-end"><kbd>⌘ K</kbd></InputGroupAddon>
+          </InputGroup>
+          <Tooltip>
+            <TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Help" />}>
+              <CircleHelp />
+            </TooltipTrigger>
+            <TooltipContent>Help & documentation</TooltipContent>
+          </Tooltip>
+          <Badge variant="outline" className="ent-region">
             <i /> EU Central
-          </span>
+          </Badge>
         </header>
         <div className="vh-content ent-content">
-          {error && <div className="vh-error">{error}</div>}
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertTitle>Request failed</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
           {selectedVm ? (
             <VMDetail vm={selectedVm} domains={account.domains} close={closeVm} refresh={refresh} />
           ) : (
@@ -4039,7 +4205,7 @@ function Dashboard({ user, onLogout }) {
             </>
           )}
         </div>
-      </main>
+      </SidebarInset>
       {deploy && (
         <Deploy
           account={account}
@@ -4050,7 +4216,7 @@ function Dashboard({ user, onLogout }) {
           onCreated={() => refresh()}
         />
       )}
-    </div>
+    </SidebarProvider>
   );
 }
 

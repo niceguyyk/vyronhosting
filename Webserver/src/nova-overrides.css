@@ -323,3 +323,123 @@ html[data-theme="dark"] .landing :where(.hero-badge, .popular-tag) {
     transition-duration: .01ms !important;
   }
 }
+
+/* Shadcn compositions replace the legacy auth and application shells. */
+.vh-auth .shadcn-auth-form {
+  width: min(390px, 100%);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.vh-auth .shadcn-auth-form input {
+  margin-top: 0;
+  padding: 0.25rem 0.625rem;
+  border-color: var(--input);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--input) 30%, transparent);
+}
+
+.vh-auth .shadcn-auth-form label {
+  display: flex;
+  margin: 0;
+  color: var(--foreground);
+  font-size: 0.875rem;
+}
+
+[data-slot="sidebar-wrapper"].ent-shell {
+  display: flex;
+  min-height: 100svh;
+  background: var(--background);
+}
+
+[data-slot="sidebar-inset"] .ent-top {
+  width: 100%;
+  min-width: 0;
+}
+
+[data-slot="sidebar-inset"] .ent-content {
+  width: 100%;
+}
+
+.ent-stat-card [data-slot="card-header"] > span {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+
+.ent-stat-card [data-slot="card-content"] > strong {
+  position: relative;
+  z-index: 1;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.ent-stat-card [data-slot="card-content"] > svg {
+  position: absolute;
+  right: 1rem;
+  bottom: 0.75rem;
+  width: 7.5rem;
+  height: 2.5rem;
+}
+
+.ent-panel [data-slot="card-header"] {
+  border-bottom: 1px solid var(--border);
+}
+
+.ent-panel [data-slot="card-footer"] {
+  justify-content: flex-start;
+}
+
+.ent-stats .ent-stat-card {
+  min-height: 10.25rem;
+}
+
+.ent-stat-card [data-slot="card-header"] [data-slot="card-title"] {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+.ent-stat-card [data-slot="card-header"] [data-slot="card-description"] {
+  margin-top: 0.125rem;
+  font-size: 0.6875rem;
+}
+
+.ent-instances > [data-slot="card-content"] > div > article {
+  min-height: 4.75rem;
+  grid-template-columns: 2.5rem minmax(10rem, 1fr) 6rem 7.5rem 7.5rem 2rem;
+}
+
+.ent-instances article > div strong,
+.ent-activity article strong {
+  font-size: 0.75rem;
+}
+
+.ent-instances article > div small,
+.ent-instances article > em,
+.ent-instances label b,
+.ent-activity article p,
+.ent-activity article small {
+  font-size: 0.6875rem;
+}
+
+.ent-instances label small {
+  font-size: 0.625rem;
+}
+
+.ent-instances article > label [data-slot="progress"] {
+  grid-column: 1 / -1;
+  gap: 0;
+}
+
+.ent-activity > [data-slot="card-content"] > article {
+  min-height: 4.5rem;
+  margin: 0;
+  padding: 0.875rem 0;
+}

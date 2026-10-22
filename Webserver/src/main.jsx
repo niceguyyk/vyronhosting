@@ -10,7 +10,8 @@ import './site-dialog.css'
 import './domain-spacing.css'
 import './shadcn.css'
 import './nova-overrides.css'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 createRoot(document.getElementById('root')).render(
-  <React.StrictMode><App /></React.StrictMode>
+  <React.StrictMode><TooltipProvider><App /></TooltipProvider></React.StrictMode>
 )

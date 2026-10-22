@@ -1,0 +1,325 @@
+/* Vyron's shadcn/ui Nova skin. Legacy selectors remain for behavior and layout;
+   this layer maps the existing product surface onto the shared shadcn tokens. */
+
+html[data-theme="dark"],
+html[data-theme="dark"] body {
+  background: var(--background) !important;
+  color: var(--foreground) !important;
+  color-scheme: dark;
+}
+
+body {
+  font-family: var(--font-sans);
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  color: var(--primary-foreground);
+  background: color-mix(in oklch, var(--primary) 72%, transparent);
+}
+
+:where(button, a, input, select, textarea) {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(.2, .8, .2, 1);
+}
+
+:where(button, a, input, select, textarea):focus-visible {
+  outline: none;
+  border-color: var(--ring) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 28%, transparent) !important;
+}
+
+html[data-theme="dark"] :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+  color: var(--foreground) !important;
+  background: color-mix(in oklch, var(--input) 54%, transparent) !important;
+  border: 1px solid var(--input) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: inset 0 1px 0 color-mix(in oklch, white 3%, transparent);
+}
+
+:where(input, textarea)::placeholder {
+  color: var(--muted-foreground) !important;
+  opacity: .78;
+}
+
+/* App shell and navigation */
+html[data-theme="dark"] :where(.ent-shell, .vh-shell, .app-shell) {
+  background: var(--background) !important;
+}
+
+html[data-theme="dark"] :where(.ent-shell > aside, .vh-shell > aside, .sidebar) {
+  background: var(--sidebar) !important;
+  border-color: var(--sidebar-border) !important;
+  box-shadow: 1px 0 0 color-mix(in oklch, white 2%, transparent);
+}
+
+html[data-theme="dark"] :where(.ent-top, .vh-top, .topbar) {
+  background: color-mix(in oklch, var(--background) 88%, transparent) !important;
+  border-color: var(--border) !important;
+  backdrop-filter: blur(18px) saturate(125%);
+}
+
+html[data-theme="dark"] :where(.ent-workspace, .workspace) {
+  background: color-mix(in oklch, var(--sidebar-accent) 72%, transparent) !important;
+  border: 1px solid var(--sidebar-border) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+html[data-theme="dark"] :where(.ent-shell > aside nav button, .vh-shell nav button, .sidebar nav button) {
+  color: var(--muted-foreground) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-lg) !important;
+  background: transparent !important;
+  font-weight: 500;
+}
+
+html[data-theme="dark"] :where(.ent-shell > aside nav button, .vh-shell nav button, .sidebar nav button):hover {
+  color: var(--sidebar-accent-foreground) !important;
+  background: var(--sidebar-accent) !important;
+}
+
+html[data-theme="dark"] :where(.ent-shell > aside nav button.active, .vh-shell nav button.active, .sidebar nav button.active) {
+  color: var(--sidebar-primary-foreground) !important;
+  background: color-mix(in oklch, var(--sidebar-primary) 22%, var(--sidebar-accent)) !important;
+  border-color: color-mix(in oklch, var(--sidebar-primary) 32%, transparent) !important;
+  box-shadow: inset 3px 0 0 var(--sidebar-primary);
+}
+
+/* Nova surfaces */
+html[data-theme="dark"] :where(
+  .ent-panel,
+  .vh-panel,
+  .stat-card,
+  .panel,
+  .settings-card,
+  .server-card,
+  .vm-summary-panel,
+  .vm-activity-panel,
+  .vm-graph-panel,
+  .node-websites,
+  .web-terminal,
+  .minecraft-panel,
+  .domain-connect-panel,
+  .report-result,
+  .report-form
+) {
+  color: var(--card-foreground) !important;
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: 0 1px 1px color-mix(in oklch, black 18%, transparent), 0 14px 34px color-mix(in oklch, black 7%, transparent) !important;
+}
+
+html[data-theme="dark"] :where(.ent-panel, .vh-panel, .settings-card, .node-websites) > header {
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] :where(.ent-panel, .vh-panel, .settings-card, .node-websites) :where(p, small, label, .vm-muted) {
+  color: var(--muted-foreground);
+}
+
+.ent-stat-card {
+  position: relative;
+  min-height: 116px;
+  padding: 17px !important;
+  gap: 0 !important;
+  border: 1px solid var(--border) !important;
+  background: var(--card) !important;
+  box-shadow: 0 1px 1px color-mix(in oklch, black 20%, transparent) !important;
+}
+
+.ent-stat-card:hover {
+  border-color: color-mix(in oklch, var(--primary) 34%, var(--border)) !important;
+  transform: translateY(-1px);
+}
+
+.ent-stat-card > header,
+.ent-stat-card > strong,
+.ent-stat-card > svg {
+  width: auto;
+}
+
+.ent-live-badge {
+  color: oklch(0.78 0.15 165) !important;
+  border-color: color-mix(in oklch, oklch(0.72 0.16 165) 35%, transparent) !important;
+  background: color-mix(in oklch, oklch(0.72 0.16 165) 10%, transparent) !important;
+  letter-spacing: .08em;
+}
+
+.ent-live-badge i {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in oklch, currentColor 16%, transparent);
+}
+
+/* Controls */
+.ent-primary-action {
+  min-height: 34px;
+  color: var(--primary-foreground) !important;
+  background: var(--primary) !important;
+  box-shadow: 0 1px 2px color-mix(in oklch, black 30%, transparent), 0 8px 20px color-mix(in oklch, var(--primary) 18%, transparent) !important;
+}
+
+.ent-primary-action:hover {
+  background: color-mix(in oklch, var(--primary) 84%, white) !important;
+}
+
+html[data-theme="dark"] :where(
+  .vh-auth form > button,
+  .vh-modal footer > button:last-child,
+  .vh-launched button,
+  .vh-empty button,
+  .vh-title > button,
+  .vh-helper form button,
+  .node-websites .deploy-websites
+) {
+  color: var(--primary-foreground) !important;
+  background: var(--primary) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: 0 1px 2px color-mix(in oklch, black 28%, transparent) !important;
+}
+
+html[data-theme="dark"] :where(.secondary, button.secondary, .node-websites .add-website) {
+  color: var(--secondary-foreground) !important;
+  background: var(--secondary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+html[data-theme="dark"] :where(.ghost, button.ghost, .icon-btn, .copy-action, .theme-toggle, .docs) {
+  color: var(--muted-foreground) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  border-radius: var(--radius-md) !important;
+}
+
+html[data-theme="dark"] :where(.ghost, button.ghost, .icon-btn, .copy-action, .theme-toggle, .docs):hover {
+  color: var(--foreground) !important;
+  background: var(--muted) !important;
+}
+
+html[data-theme="dark"] :where(.danger, button.danger, .website-remove) {
+  color: var(--destructive) !important;
+}
+
+html[data-theme="dark"] :where(.danger, button.danger, .website-remove):hover {
+  background: color-mix(in oklch, var(--destructive) 14%, transparent) !important;
+}
+
+button:disabled {
+  cursor: not-allowed !important;
+  opacity: .48 !important;
+  transform: none !important;
+}
+
+/* Dialogs and feedback */
+html[data-theme="dark"] :where(.vh-modal-bg, .modal-overlay, .stripe-checkout-overlay) {
+  background: color-mix(in oklch, black 68%, transparent) !important;
+  backdrop-filter: blur(8px) saturate(115%);
+}
+
+html[data-theme="dark"] :where(.vh-modal, .deploy-modal, .success-modal, .stripe-checkout-modal) {
+  color: var(--popover-foreground) !important;
+  background: var(--popover) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-2xl) !important;
+  box-shadow: 0 28px 90px color-mix(in oklch, black 55%, transparent) !important;
+}
+
+html[data-theme="dark"] :where(.vh-error, .deploy-error) {
+  color: oklch(0.82 0.12 23) !important;
+  background: color-mix(in oklch, var(--destructive) 12%, var(--card)) !important;
+  border: 1px solid color-mix(in oklch, var(--destructive) 35%, transparent) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+html[data-theme="dark"] .vh-success {
+  color: oklch(0.82 0.14 165) !important;
+  background: color-mix(in oklch, oklch(0.72 0.16 165) 10%, var(--card)) !important;
+  border: 1px solid color-mix(in oklch, oklch(0.72 0.16 165) 32%, transparent) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+/* Multi-site editor */
+html[data-theme="dark"] .node-website-list > article {
+  background: color-mix(in oklch, var(--muted) 42%, transparent) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+html[data-theme="dark"] .node-website-list > article.enabled {
+  border-color: color-mix(in oklch, var(--primary) 32%, var(--border)) !important;
+}
+
+html[data-theme="dark"] .website-slot {
+  color: var(--primary-foreground) !important;
+  background: var(--primary) !important;
+  border-radius: var(--radius-md) !important;
+}
+
+/* Tables, lists and code surfaces */
+html[data-theme="dark"] :where(.ent-instances article, .ent-activity article, .vh-mini-list > div, .admin-order, .team-list > div) {
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] :where(.ent-instances article, .vh-mini-list > div):hover {
+  background: color-mix(in oklch, var(--muted) 52%, transparent) !important;
+}
+
+html[data-theme="dark"] :where(code, kbd, .syntax-editor, .xterm-host) {
+  border-color: var(--border) !important;
+}
+
+/* Public landing page */
+html[data-theme="dark"] .landing {
+  color: var(--foreground) !important;
+  background: var(--background) !important;
+}
+
+html[data-theme="dark"] .landing :where(.land-nav, .product-window, .feature, .deploy-card, .domain-demo, .metric-demo, .price-grid > article, .price) {
+  background: var(--card) !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 1px color-mix(in oklch, black 22%, transparent), 0 22px 60px color-mix(in oklch, black 12%, transparent) !important;
+}
+
+html[data-theme="dark"] .landing :where(.land-button, .price-card.popular > a) {
+  color: var(--primary-foreground) !important;
+  background: var(--primary) !important;
+  border-color: transparent !important;
+  border-radius: var(--radius-lg) !important;
+}
+
+html[data-theme="dark"] .landing :where(.land-button.light, .land-menu a, .nav-report) {
+  color: var(--foreground) !important;
+  background: var(--secondary) !important;
+  border-color: var(--border) !important;
+}
+
+html[data-theme="dark"] .landing :where(.hero-badge, .popular-tag) {
+  color: color-mix(in oklch, var(--primary) 76%, white) !important;
+  background: color-mix(in oklch, var(--primary) 13%, transparent) !important;
+  border-color: color-mix(in oklch, var(--primary) 32%, transparent) !important;
+}
+
+@media (max-width: 760px) {
+  html[data-theme="dark"] :where(.ent-shell > aside, .vh-shell > aside, .sidebar) {
+    box-shadow: 18px 0 60px color-mix(in oklch, black 45%, transparent) !important;
+  }
+
+  .ent-stat-card {
+    min-height: 104px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

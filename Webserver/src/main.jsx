@@ -8,6 +8,8 @@ import './portal.css'
 import './enterprise.css'
 import './site-dialog.css'
 import './domain-spacing.css'
+import './shadcn.css'
+import './nova-overrides.css'
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode><App /></React.StrictMode>

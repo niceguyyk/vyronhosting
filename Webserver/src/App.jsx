@@ -15,6 +15,10 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { browserSupportsWebAuthn, startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import "./minecraft.css";
 import "./minecraft-extensions.css";
 import "./marketplace-filters.css";
@@ -367,8 +371,10 @@ function CopyButton({ value, label = "Copy" }) {
   };
   useEffect(() => () => clearTimeout(timer.current), []);
   return (
-    <button
+    <Button
       type="button"
+      variant="ghost"
+      size="icon-sm"
       className={`copy-action ${copied ? "copied" : ""} ${failed ? "failed" : ""}`}
       onClick={copy}
       disabled={!value}
@@ -377,7 +383,7 @@ function CopyButton({ value, label = "Copy" }) {
     >
       {copied ? <Check /> : <Copy />}
       {(copied || failed) && <span>{failed ? "Copy failed" : "Copied"}</span>}
-    </button>
+    </Button>
   );
 }
 
@@ -1308,15 +1314,15 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
           <h1>Good evening, {account.user.name.split(" ")[0]}.</h1>
           <p>Everything is running smoothly across your infrastructure.</p>
         </div>
-        {canCreate && <button onClick={openDeploy}>
-          <Plus /> New node
-        </button>}
+        {canCreate && <Button className="ent-primary-action" onClick={openDeploy}>
+          <Plus data-icon="inline-start" /> New node
+        </Button>}
       </div>
       <div className="ent-stats">
         {cards.map((c) => {
           const Icon = c.icon;
           return (
-            <article key={c.label} className={c.color}>
+            <Card key={c.label} className={`ent-stat-card ${c.color}`}>
               <header>
                 <span>
                   <Icon />
@@ -1329,20 +1335,20 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
                 <polyline points={c.points} />
                 <path d={`M${c.points.replaceAll(" ", " L")} L122,40 L0,40Z`} />
               </svg>
-            </article>
+            </Card>
           );
         })}
       </div>
       <div className="ent-grid">
-        <section className="ent-panel ent-instances">
+        <Card className="ent-panel ent-instances">
           <header>
             <div>
               <h2>Nodes</h2>
               <p>Your active compute resources</p>
             </div>
-            <button onClick={() => setPage("nodes")}>
+            <Button variant="ghost" size="sm" onClick={() => setPage("nodes")}>
               View all <ChevronRight />
-            </button>
+            </Button>
           </header>
           {active.length ? (
             <div>
@@ -1396,19 +1402,19 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
                 <b>No nodes yet</b>
                 <small>Use FREE26 for 20% off your first month.</small>
               </span>
-              {canCreate && <button onClick={openDeploy}>Create node</button>}
+              {canCreate && <Button size="sm" onClick={openDeploy}>Create node</Button>}
             </div>
           )}
-        </section>
-        <section className="ent-panel ent-activity">
+        </Card>
+        <Card className="ent-panel ent-activity">
           <header>
             <div>
               <h2>Server activity</h2>
               <p>Recent server activity</p>
             </div>
-            <span>
+            <Badge variant="outline" className="ent-live-badge">
               <i /> LIVE
-            </span>
+            </Badge>
           </header>
           <div>
             {activities.length ? (
@@ -1432,12 +1438,12 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
               </div>
             )}
           </div>
-          <button onClick={() => setPage("helper")}>
+          <Button variant="ghost" size="sm" onClick={() => setPage("helper")}>
             Open AI helper <ChevronRight />
-          </button>
-        </section>
+          </Button>
+        </Card>
       </div>
-      <section className="ent-panel ent-usage">
+      <Card className="ent-panel ent-usage">
         <header>
           <div>
             <h2>Resource usage</h2>
@@ -1479,7 +1485,7 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
             Memory <b>{Math.round((usedRam / totalRam) * 100)}%</b>
           </span>
         </footer>
-      </section>
+      </Card>
     </div>
   );
 }
@@ -1727,7 +1733,7 @@ function NodeWebsites({ vm, refresh }) {
     finally { setBusy(""); }
   };
   return <form className="node-websites" onSubmit={event => submit(event, false)}>
-    <header><div><small>NODE.JS MULTI-SITE</small><h2>Multiple websites, one node</h2><p>Add websites as needed, save their start files, then deploy the new configuration.</p></div><div className="website-actions"><button type="button" className="add-website" disabled={Boolean(busy) || websites.length >= 5} onClick={addWebsite}><Plus /> {websites.length >= 5 ? "Five websites added" : "Add website"}</button><button type="submit" disabled={Boolean(busy)}><Save /> {busy === "save" ? "Saving…" : "Save websites"}</button><button type="button" className="deploy-websites" disabled={Boolean(busy) || vm.status !== "running"} onClick={event => submit(event, true)}><Play /> {busy === "deploy" ? "Deploying…" : "Deploy websites"}</button></div></header>
+    <header><div><small>NODE.JS MULTI-SITE</small><h2>Multiple websites, one node</h2><p>Add websites as needed, save their start files, then deploy the new configuration.</p></div><div className="website-actions"><Button type="button" variant="outline" className="add-website" disabled={Boolean(busy) || websites.length >= 5} onClick={addWebsite}><Plus data-icon="inline-start" /> {websites.length >= 5 ? "Five websites added" : "Add website"}</Button><Button type="submit" variant="secondary" disabled={Boolean(busy)}><Save data-icon="inline-start" /> {busy === "save" ? "Saving…" : "Save websites"}</Button><Button type="button" className="deploy-websites" disabled={Boolean(busy) || vm.status !== "running"} onClick={event => submit(event, true)}><Play data-icon="inline-start" /> {busy === "deploy" ? "Deploying…" : "Deploy websites"}</Button></div></header>
     {websites.length ? <div className="node-website-list">{websites.map(site => {
       const active = vm.websites?.some(item => Number(item.slot) === site.slot);
       const slotDomain = vm.customDomains?.find(item => Number(item.websiteSlot) === site.slot && item.status === "active")?.domain;
@@ -1735,12 +1741,12 @@ function NodeWebsites({ vm, refresh }) {
       return <article className={site.enabled ? "enabled" : ""} key={site.slot}>
         <span className="website-slot">/{site.slot}</span>
         <div><strong>Website {site.slot}</strong><small>{slotDomain ? slotDomain : active ? "Running on its own managed port" : "Not active yet"}</small></div>
-        <label><span>Start file</span><input value={site.entryFile} onChange={event => update(site.slot, { entryFile: event.target.value })} disabled={!site.enabled || Boolean(busy)} placeholder={`sites/${site.slot}/server.js`} /></label>
+        <label><span>Start file</span><Input value={site.entryFile} onChange={event => update(site.slot, { entryFile: event.target.value })} disabled={!site.enabled || Boolean(busy)} placeholder={`sites/${site.slot}/server.js`} /></label>
         {active ? <a href={address} target="_blank" rel="noreferrer"><Globe2 /> Open /{site.slot}</a> : <span className="website-pending">/{site.slot}</span>}
         <label className="website-switch"><input type="checkbox" checked={site.enabled} disabled={Boolean(busy)} onChange={event => update(site.slot, { enabled: event.target.checked })} /><i /><span>{site.enabled ? "Enabled" : "Disabled"}</span></label>
-        <button type="button" className="website-remove" disabled={Boolean(busy)} onClick={() => removeWebsite(site.slot)} aria-label={`Remove website ${site.slot}`}><Trash2 /></button>
+        <Button type="button" variant="ghost" size="icon-sm" className="website-remove" disabled={Boolean(busy)} onClick={() => removeWebsite(site.slot)} aria-label={`Remove website ${site.slot}`}><Trash2 /></Button>
       </article>;
-    })}</div> : <div className="node-websites-empty"><Globe2 /><strong>No websites configured</strong><span>Click Add website to create your first website slot.</span><button type="button" disabled={Boolean(busy)} onClick={addWebsite}><Plus /> Add website</button></div>}
+    })}</div> : <div className="node-websites-empty"><Globe2 /><strong>No websites configured</strong><span>Click Add website to create your first website slot.</span><Button type="button" variant="outline" disabled={Boolean(busy)} onClick={addWebsite}><Plus data-icon="inline-start" /> Add website</Button></div>}
     <footer><span><FileCode2 /><b>How it works</b> Upload every project into a separate folder in Files, then enter its start file here—for example <code>sites/2/server.js</code>.</span><span><Network /><b>Routes</b> Vyron configures Nginx, ports, process restarts and paths automatically.</span></footer>
     {notice && <div className="vh-success"><Check /> {notice}</div>}
     {error && <div className="vh-error">{error}</div>}

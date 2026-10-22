@@ -16,7 +16,12 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useGSAP } from "@gsap/react";
+
+gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const offers = [
   {
@@ -59,29 +64,187 @@ function Brand() {
 
 export default function LandingPage() {
   const [menu, setMenu] = useState(false);
+  const landingRef = useRef(null);
   const appBase = window.location.hostname.endsWith("vyronhosting.com")
     ? "https://app.vyronhosting.com"
     : "";
 
-  useEffect(() => {
-    const items = document.querySelectorAll("[data-reveal]");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-visible");
-            observer.unobserve(entry.target);
-          }
+  useGSAP((context, contextSafe) => {
+    const media = gsap.matchMedia();
+
+    media.add(
+      {
+        desktop: "(min-width: 761px)",
+        reducedMotion: "(prefers-reduced-motion: reduce)",
+      },
+      ({ conditions }) => {
+        if (conditions.reducedMotion) {
+          gsap.set("[data-reveal], .land-hero > :not(.hero-glow)", {
+            clearProps: "all",
+          });
+          return;
+        }
+
+        const hero = gsap.timeline({
+          defaults: { duration: 0.72, ease: "power3.out" },
+        });
+        hero
+          .from(".land-nav", { autoAlpha: 0, y: -18, duration: 0.55 })
+          .from(".hero-badge", { autoAlpha: 0, y: 18 }, "-=0.28")
+          .from(".land-hero h1", { autoAlpha: 0, y: 28 }, "-=0.46")
+          .from(".land-hero > p", { autoAlpha: 0, y: 22 }, "-=0.5")
+          .fromTo(
+            ".hero-actions > *",
+            { autoAlpha: 0, y: 18 },
+            { autoAlpha: 1, y: 0, stagger: 0.09 },
+            "-=0.48",
+          )
+          .fromTo(
+            ".hero-proof > span",
+            { autoAlpha: 0, y: 12 },
+            { autoAlpha: 1, y: 0, stagger: 0.07 },
+            "-=0.5",
+          )
+          .fromTo(
+            ".product-window",
+            { autoAlpha: 0, y: 42, scale: 0.975 },
+            { autoAlpha: 1, y: 0, scale: 1, duration: 0.9 },
+            "-=0.4",
+          )
+          .fromTo(
+            ".product-window .mini-stats > div, .deploy-card, .agent-strip",
+            { autoAlpha: 0, y: 14 },
+            { autoAlpha: 1, y: 0, stagger: 0.08, duration: 0.45 },
+            "-=0.5",
+          );
+
+        gsap.to(".hero-glow", {
+          yPercent: 22,
+          ease: "none",
+          scrollTrigger: {
+            trigger: ".land-hero",
+            start: "top top",
+            end: "bottom top",
+            scrub: 0.8,
+          },
+        });
+        gsap.to(".product-window", {
+          y: conditions.desktop ? -34 : -14,
+          ease: "none",
+          scrollTrigger: {
+            trigger: ".land-hero",
+            start: "45% center",
+            end: "bottom top",
+            scrub: 0.7,
+          },
+        });
+
+        gsap.utils.toArray("[data-reveal]").forEach((section) => {
+          const candidates = section.matches(".logo-cloud")
+            ? section.children
+            : section.querySelectorAll(
+                ":scope > .section-copy, :scope > .section-center, :scope > .agent-visual, :scope > div:not(.section-copy):not(.section-center):not(.agent-visual), :scope > footer",
+              );
+          const targets = candidates.length ? candidates : [section];
+          gsap.from(targets, {
+            autoAlpha: 0,
+            y: 38,
+            duration: 0.78,
+            stagger: 0.11,
+            ease: "power3.out",
+            clearProps: "transform,opacity,visibility",
+            scrollTrigger: {
+              trigger: section,
+              start: "top 86%",
+              once: true,
+            },
+          });
+        });
+
+        gsap.from(".feature-grid .feature", {
+          autoAlpha: 0,
+          y: 34,
+          scale: 0.98,
+          duration: 0.65,
+          stagger: 0.1,
+          ease: "power3.out",
+          clearProps: "transform,opacity,visibility",
+          scrollTrigger: { trigger: ".feature-grid", start: "top 84%", once: true },
+        });
+        gsap.from(".price-grid .price-card", {
+          autoAlpha: 0,
+          y: 36,
+          rotationX: -5,
+          transformOrigin: "50% 100%",
+          duration: 0.7,
+          stagger: 0.09,
+          ease: "power3.out",
+          clearProps: "transform,opacity,visibility",
+          scrollTrigger: { trigger: ".price-grid", start: "top 85%", once: true },
+        });
+        gsap.fromTo(
+          ".metric-demo path",
+          { strokeDashoffset: 410 },
+          {
+            strokeDashoffset: 0,
+            duration: 1.8,
+            ease: "power2.inOut",
+            scrollTrigger: { trigger: ".metric-demo", start: "top 88%", once: true },
+          },
+        );
+
+        gsap.to(".agent-core", {
+          scale: 1.055,
+          duration: 2.2,
+          ease: "sine.inOut",
+          repeat: -1,
+          yoyo: true,
+        });
+        gsap.to(".orbit.o1", { rotation: 360, duration: 22, ease: "none", repeat: -1 });
+        gsap.to(".orbit.o2", { rotation: -360, duration: 34, ease: "none", repeat: -1 });
+        gsap.to(".agent-node", {
+          y: -7,
+          duration: 2.2,
+          ease: "sine.inOut",
+          stagger: { each: 0.35, from: "random" },
+          repeat: -1,
+          yoyo: true,
+        });
+        gsap.to(".deploy-card .pulse", {
+          scale: 1.65,
+          autoAlpha: 0.45,
+          duration: 1.25,
+          ease: "power1.out",
+          repeat: -1,
+          yoyo: true,
         });
       },
-      { threshold: 0.14 },
     );
-    items.forEach((item) => observer.observe(item));
-    return () => observer.disconnect();
-  }, []);
+
+    const hoverTargets = gsap.utils.toArray(".feature, .price-card, .product-window");
+    const enter = contextSafe((event) => {
+      if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      gsap.to(event.currentTarget, { y: -7, scale: 1.008, duration: 0.32, ease: "power2.out", overwrite: "auto" });
+    });
+    const leave = contextSafe((event) => {
+      gsap.to(event.currentTarget, { y: 0, scale: 1, duration: 0.42, ease: "power3.out", overwrite: "auto", clearProps: "transform" });
+    });
+    hoverTargets.forEach((target) => {
+      target.addEventListener("pointerenter", enter);
+      target.addEventListener("pointerleave", leave);
+    });
+
+    return () => {
+      media.revert();
+      hoverTargets.forEach((target) => {
+        target.removeEventListener("pointerenter", enter);
+        target.removeEventListener("pointerleave", leave);
+      });
+    };
+  }, { scope: landingRef });
 
   return (
-    <div className="landing">
+    <div className="landing" ref={landingRef}>
       <nav className="land-nav">
         <Brand />
         <div className={menu ? "nav-links open" : "nav-links"}>

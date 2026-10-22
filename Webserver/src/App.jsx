@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import { loadStripe } from "@stripe/stripe-js";
 import { CheckoutElementsProvider, ExpressCheckoutElement, PaymentElement, useCheckoutElements } from "@stripe/react-stripe-js/checkout";
 import LandingPage from "./Landing.jsx";
@@ -80,6 +82,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+
+gsap.registerPlugin(useGSAP);
 import "./minecraft.css";
 import "./minecraft-extensions.css";
 import "./marketplace-filters.css";
@@ -704,12 +708,26 @@ function StorageUpgrade({ vm, close, refresh }) {
 
 function Auth({ mode, onAuth }) {
   const register = mode === "register";
+  const authRef = useRef(null);
   const [form, setForm] = useState({ name: "", email: "", password: "", twoFactorCode: "", referralCode: register ? new URLSearchParams(location.search).get("ref") || "" : "", acceptTerms: false, acceptPrivacy: false }),
     [error, setError] = useState(""),
     [pendingMessage, setPendingMessage] = useState(""),
     [twoFactorRequired, setTwoFactorRequired] = useState(false),
     [busy, setBusy] = useState(false),
     [passkeyBusy, setPasskeyBusy] = useState(false);
+  useGSAP(() => {
+    const media = gsap.matchMedia();
+    media.add("(prefers-reduced-motion: no-preference)", () => {
+      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+      timeline
+        .from(".vh-back", { autoAlpha: 0, x: -14, duration: 0.45 })
+        .from("[data-slot='card']", { autoAlpha: 0, y: 28, scale: 0.985, duration: 0.7 }, "-=0.25")
+        .from("[data-slot='card-header'] > *", { autoAlpha: 0, y: 12, duration: 0.4, stagger: 0.06 }, "-=0.4")
+        .from("[data-slot='field']", { autoAlpha: 0, y: 10, duration: 0.36, stagger: 0.045 }, "-=0.28")
+        .from("[data-slot='card-footer']", { autoAlpha: 0, y: 8, duration: 0.35 }, "-=0.2");
+    });
+    return () => media.revert();
+  }, { scope: authRef, dependencies: [mode], revertOnUpdate: true });
   const submit = async (e) => {
     e.preventDefault();
     setError("");
@@ -753,7 +771,7 @@ function Auth({ mode, onAuth }) {
     } finally { setPasskeyBusy(false); }
   };
   return (
-    <div className="vh-auth">
+    <div className="vh-auth" ref={authRef}>
       <a className="vh-back" href="/">
         ← Back to website
       </a>
@@ -1355,6 +1373,7 @@ function Deploy({ close, onCreated, account }) {
 }
 
 function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
+  const overviewRef = useRef(null);
   const active = account.vms.filter(
     (v) => !["deleted", "failed"].includes(v.status),
   );
@@ -1416,8 +1435,20 @@ function Overview({ account, openDeploy, setPage, openVm, canCreate = true }) {
       })),
   ].slice(0, 3);
   const activities = account.events?.length ? account.events.slice(0, 3).map((event) => ({ title: event.title, copy: event.nodeName ? `${event.nodeName} · ${event.detail}` : event.detail, kind: event.severity, createdAt: event.createdAt })) : fallbackActivities;
+  useGSAP(() => {
+    const media = gsap.matchMedia();
+    media.add("(prefers-reduced-motion: no-preference)", () => {
+      const timeline = gsap.timeline({ defaults: { duration: 0.58, ease: "power3.out" } });
+      timeline
+        .from(".ent-welcome > *", { autoAlpha: 0, y: 18, stagger: 0.08 })
+        .from(".ent-stat-card", { autoAlpha: 0, y: 24, scale: 0.985, stagger: 0.07 }, "-=0.3")
+        .from(".ent-grid > *", { autoAlpha: 0, y: 24, stagger: 0.1 }, "-=0.28")
+        .from(".ent-instances article, .ent-activity article", { autoAlpha: 0, x: -12, duration: 0.38, stagger: 0.045 }, "-=0.3");
+    });
+    return () => media.revert();
+  }, { scope: overviewRef });
   return (
-    <div className="ent-overview">
+    <div className="ent-overview" ref={overviewRef}>
       <div className="ent-welcome">
         <div>
           <small>
@@ -3893,6 +3924,8 @@ function AdminPanel() {
 }
 
 function Dashboard({ user, onLogout }) {
+  const dashboardRef = useRef(null);
+  const contentRef = useRef(null);
   const routeMatch = window.location.pathname.match(
     /^\/(?:nodes|instances)\/([^/]+)$/,
   );
@@ -3960,6 +3993,21 @@ function Dashboard({ user, onLogout }) {
       window.removeEventListener("popstate", pop);
     };
   }, []);
+  useGSAP(() => {
+    if (!loaded || !contentRef.current) return;
+    const media = gsap.matchMedia();
+    media.add("(prefers-reduced-motion: no-preference)", () => {
+      const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+      timeline
+        .from(".vh-top > *", { autoAlpha: 0, y: -10, duration: 0.42, stagger: 0.035 })
+        .from(".vh-content > *", { autoAlpha: 0, y: 18, duration: 0.52, stagger: 0.06 }, "-=0.2");
+    });
+    return () => media.revert();
+  }, {
+    scope: dashboardRef,
+    dependencies: [loaded, page, selectedId],
+    revertOnUpdate: true,
+  });
   const nav = [
     ["overview", "Overview", LayoutDashboard],
     ["nodes", "Nodes", Server],
@@ -4013,6 +4061,7 @@ function Dashboard({ user, onLogout }) {
   const usagePercent = Math.min(100, (monthly / 50) * 100);
   return (
     <SidebarProvider
+      ref={dashboardRef}
       className="vh-shell ent-shell"
       style={{ "--sidebar-width": "17rem", "--sidebar-width-icon": "3.5rem" }}
     >
@@ -4158,7 +4207,7 @@ function Dashboard({ user, onLogout }) {
             <i /> EU Central
           </Badge>
         </header>
-        <div className="vh-content ent-content">
+        <div className="vh-content ent-content" ref={contentRef}>
           {error && (
             <Alert variant="destructive" className="mb-4">
               <AlertTitle>Request failed</AlertTitle>

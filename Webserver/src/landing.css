@@ -592,7 +592,7 @@
   background: #785bdd;
   box-shadow: 0 0 60px #785bdd66;
   z-index: 2;
-  animation: core-breathe 4s ease-in-out infinite;
+  will-change: transform;
 }
 .agent-core svg {
   width: 32px;
@@ -607,12 +607,12 @@
 .o1 {
   width: 235px;
   height: 235px;
-  animation: orbit-clockwise 22s linear infinite;
+  will-change: transform;
 }
 .o2 {
   width: 370px;
   height: 370px;
-  animation: orbit-counter 34s linear infinite;
+  will-change: transform;
 }
 .agent-node {
   position: absolute;
@@ -627,7 +627,7 @@
   color: #c8c6c1;
   z-index: 3;
   box-shadow: 0 10px 30px #0004;
-  animation: node-float 4.5s ease-in-out infinite;
+  will-change: transform;
 }
 .agent-node svg {
   width: 14px;
@@ -675,15 +675,7 @@
   background: #fff;
   border-radius: 13px;
   padding: 24px 20px;
-  transition:
-    transform 0.3s ease,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
-}
-.price-card:hover {
-  transform: translateY(-7px);
-  border-color: #7658d9;
-  box-shadow: 0 22px 55px #0002;
+  will-change: transform;
 }
 .price-card.popular {
   border-color: #8064db;
@@ -838,55 +830,14 @@ footer > span {
   color: #aaa;
 }
 
-[data-reveal] {
-  opacity: 0;
-  transform: translateY(34px);
-  transition:
-    opacity 0.8s cubic-bezier(0.2, 0.75, 0.25, 1),
-    transform 0.8s cubic-bezier(0.2, 0.75, 0.25, 1);
-}
-[data-reveal].is-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-.land-hero > :not(.hero-glow) {
-  animation: hero-enter 0.75s both cubic-bezier(0.2, 0.75, 0.25, 1);
-}
-.land-hero > h1 {
-  animation-delay: 0.08s;
-}
-.land-hero > p {
-  animation-delay: 0.16s;
-}
-.hero-actions,
-.hero-proof {
-  animation-delay: 0.24s !important;
-}
 .product-window {
-  animation-delay: 0.34s !important;
-  transition:
-    transform 0.45s ease,
-    box-shadow 0.45s ease;
-}
-.product-window:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 45px 100px #443c6430;
+  will-change: transform;
 }
 .feature {
-  transition:
-    transform 0.35s ease,
-    border-color 0.35s ease,
-    box-shadow 0.35s ease;
-}
-.feature:hover {
-  transform: translateY(-6px);
-  border-color: #7658d9;
-  box-shadow: 0 22px 60px #0002;
+  will-change: transform;
 }
 .metric-demo path {
   stroke-dasharray: 410;
-  stroke-dashoffset: 410;
-  animation: draw-metric 2.4s 0.6s ease forwards;
 }
 .land-button svg,
 .land-link svg,
@@ -898,70 +849,11 @@ footer > span {
 .price-card > a:hover svg {
   transform: translateX(4px);
 }
-.deploy-card .pulse {
-  animation: status-pulse 2s ease-out infinite;
-}
-
-@keyframes hero-enter {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes core-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 45px #785bdd55;
-  }
-  50% {
-    transform: scale(1.06);
-    box-shadow: 0 0 85px #785bdd88;
-  }
-}
-@keyframes orbit-clockwise {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@keyframes orbit-counter {
-  to {
-    transform: rotate(-360deg);
-  }
-}
-@keyframes node-float {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  50% {
-    translate: 0 -7px;
-  }
-}
-@keyframes draw-metric {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
 @keyframes cta-orbit {
   to {
     transform: rotate(360deg);
   }
 }
-@keyframes status-pulse {
-  0% {
-    box-shadow: 0 0 0 0 #49a47d55;
-  }
-  70%,
-  100% {
-    box-shadow: 0 0 0 8px #49a47d00;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -970,10 +862,6 @@ footer > span {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-  [data-reveal] {
-    opacity: 1;
-    transform: none;
   }
 }
 @media (max-width: 760px) {

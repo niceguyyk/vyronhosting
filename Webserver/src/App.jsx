@@ -1497,10 +1497,28 @@ function NodeFiles({ vm }) {
     [dragActive, setDragActive] = useState(false),
     [uploadProgress, setUploadProgress] = useState(null),
     [uploadQueue, setUploadQueue] = useState([]),
+    [contextMenu, setContextMenu] = useState(null),
     [error, setError] = useState("");
   const dragDepth = useRef(0);
+  useEffect(() => {
+    if (!contextMenu) return;
+    const closeMenu = () => setContextMenu(null);
+    const closeOnEscape = event => { if (event.key === "Escape") closeMenu(); };
+    window.addEventListener("pointerdown", closeMenu);
+    window.addEventListener("blur", closeMenu);
+    window.addEventListener("resize", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeMenu);
+      window.removeEventListener("blur", closeMenu);
+      window.removeEventListener("resize", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextMenu]);
   const loadDirectory = async (next = directory) => {
-    setBusy("list"); setError("");
+    setContextMenu(null); setBusy("list"); setError("");
     try { const result = await api(`/v1/vms/${vm.name}/files?path=${encodeURIComponent(next)}`); setFiles(result.files); setDirectory(next); }
     catch (e) { setError(e.message); }
     finally { setBusy(""); }
@@ -1600,6 +1618,30 @@ function NodeFiles({ vm }) {
     catch (e) { setError(e.message); }
     finally { setBusy(""); }
   };
+  const openFileMenu = (event, file) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const width = 176, height = 54, gap = 8;
+    setContextMenu({
+      file,
+      x: Math.max(gap, Math.min(event.clientX, window.innerWidth - width - gap)),
+      y: Math.max(gap, Math.min(event.clientY, window.innerHeight - height - gap)),
+    });
+  };
+  const deleteFileEntry = async file => {
+    setContextMenu(null);
+    const kind = file.type === "directory" ? "folder" : "file";
+    if (!await siteConfirm({ title: `Delete ${kind} “${file.name}”?`, message: file.type === "directory" ? "The folder and everything inside it will be permanently removed." : "This file will be permanently removed.", confirmLabel: `Delete ${kind}`, danger: true })) return;
+    setBusy("delete"); setError("");
+    try {
+      await api(`/v1/vms/${vm.name}/file`, { method: "DELETE", body: JSON.stringify({ path: file.path }) });
+      if (selected === file.path || (file.type === "directory" && selected.startsWith(`${file.path}/`))) {
+        setSelected(""); setContent(""); setSavedContent("");
+      }
+      await loadDirectory(directory);
+    } catch (e) { setError(e.message); }
+    finally { setBusy(""); }
+  };
   const readEntry = entry => new Promise((resolve, reject) => entry.file(resolve, reject));
   const readDirectoryEntries = async reader => {
     const entries = [];
@@ -1653,7 +1695,7 @@ function NodeFiles({ vm }) {
       <aside>
         <div className="file-path"><button onClick={() => loadDirectory(".")}>{minecraftFiles ? "minecraft" : projectFiles ? "app" : "files"}</button><span>/ {directory === "." ? "" : directory}</span></div>
         {parent && <button className="file-row directory" onClick={() => loadDirectory(parent)}><Folder /><span>..</span></button>}
-        {files.map(file => <button className={`file-row ${file.type} ${selected === file.path ? "active" : ""}`} key={file.path} onClick={() => file.type === "directory" ? loadDirectory(file.path) : openFile(file.path)}>{file.type === "directory" ? <Folder /> : <FileCode2 />}<span>{file.name}</span>{file.size !== null && <small>{file.size < 1024 ? `${file.size} B` : `${(file.size / 1024).toFixed(1)} KB`}</small>}</button>)}
+        {files.map(file => <button className={`file-row ${file.type} ${selected === file.path ? "active" : ""}`} key={file.path} onClick={() => file.type === "directory" ? loadDirectory(file.path) : openFile(file.path)} onContextMenu={event => openFileMenu(event, file)}>{file.type === "directory" ? <Folder /> : <FileCode2 />}<span>{file.name}</span>{file.size !== null && <small>{file.size < 1024 ? `${file.size} B` : `${(file.size / 1024).toFixed(1)} KB`}</small>}</button>)}
         {!files.length && !busy && <p className="files-empty">This folder is empty.</p>}
         <form className="new-file" onSubmit={createFile}><input value={newName} onChange={e => setNewName(e.target.value)} placeholder="new-file.js" /><button disabled={busy || !newName.trim()}><Plus /></button></form>
       </aside>
@@ -1661,6 +1703,9 @@ function NodeFiles({ vm }) {
         {selected ? <><header><span><FileCode2 /> {selected}<em>{editorConfig.label}</em></span><button onClick={saveFile} disabled={busy || content === savedContent}><Save /> {busy === "save" ? "Saving…" : content === savedContent ? "Saved" : projectFiles ? "Save & restart" : "Save file"}</button></header><CodeMirror value={content} onChange={setContent} extensions={editorExtensions} theme={oneDark} height="100%" minHeight="430px" basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true, highlightActiveLineGutter: true }} className="syntax-editor" /></> : <div className="file-welcome"><UploadCloud /><h3>{files.length ? "Select a file to edit" : "Upload your first file"}</h3><p>{projectFiles ? "Project changes can restart the Node.js service automatically." : "Files are stored securely on this node."}</p></div>}
       </main>
     </div>
+    {contextMenu && <div className="file-context-menu" role="menu" aria-label={`Actions for ${contextMenu.file.name}`} style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={event => event.stopPropagation()}>
+      <button type="button" role="menuitem" onClick={() => deleteFileEntry(contextMenu.file)} disabled={Boolean(busy)}><Trash2 /> Delete {contextMenu.file.type === "directory" ? "folder" : "file"}</button>
+    </div>}
   </section>;
 }
 
